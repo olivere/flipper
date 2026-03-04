@@ -1,7 +1,7 @@
 ---
 name: dev
 description: "Development helper: `/dev setup` guides you from zero to image-on-device, `/dev doctor` diagnoses and repairs your environment"
-argument-hint: <setup|doctor>
+argument-hint: <setup|doctor|daemon>
 disable-model-invocation: true
 allowed-tools: Bash, Read, Write, Edit, Glob, Grep, WebSearch, WebFetch, AskUserQuestion, TaskCreate, TaskUpdate, TaskList
 ---
