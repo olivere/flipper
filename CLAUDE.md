@@ -27,6 +27,10 @@ make setup          # go mod tidy
 ./bin/flipper serve --config ./config.toml  # custom config path
 ```
 
+## TLS
+
+The server runs HTTPS with a self-signed certificate by default. The `selfcert` package generates an in-memory ECDSA P-256 cert on startup, including the machine's local IPs as SANs. TRMNL devices connect to `https://<ip>:3443` and accept the self-signed cert. This works as-is on the local network; do not disable TLS or add a reverse proxy unless there is a specific reason.
+
 ## Config
 
 TOML at `~/.config/flipper/config.toml` (or pass `--config <path>`). All fields have defaults. Environment variables (`FLIPPER_ADDR`, `FLIPPER_SECRET_KEY`, etc.) override file values.

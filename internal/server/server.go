@@ -95,10 +95,11 @@ func Run(ctx context.Context, cfg *config.Config) error {
 
 	logger.Info("server starting", "addr", cfg.Server.Addr, "tls", useTLS)
 	go func() {
-		if err := serve(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+		if err := serve(); !errors.Is(err, http.ErrServerClosed) {
 			logger.Error("server error", "err", err)
-			os.Exit(1)
 		}
+		logger.Info("stopped serving new connections")
+		stop()
 	}()
 
 	<-ctx.Done()
