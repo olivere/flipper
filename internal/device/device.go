@@ -13,10 +13,20 @@ import (
 	"github.com/olivere/flipper/internal/xdg"
 )
 
+// Telemetry holds device health data reported via HTTP headers on each
+// /api/display request.
+type Telemetry struct {
+	FirmwareVersion string `json:"firmware_version,omitempty"`
+	BatteryVoltage  string `json:"battery_voltage,omitempty"`
+	WifiRSSI        string `json:"wifi_rssi,omitempty"`
+	Model           string `json:"model,omitempty"`
+}
+
 type Device struct {
 	MAC       string    `json:"mac"`
 	APIKey    string    `json:"api_key"`
 	Name      string    `json:"name"`
+	Telemetry Telemetry `json:"telemetry,omitzero"`
 	FirstSeen time.Time `json:"first_seen"`
 	LastSeen  time.Time `json:"last_seen"`
 }
@@ -121,20 +131,70 @@ func (r *Registry) AdoptToken(mac, token string) bool {
 	return true
 }
 
-// Touch updates the device's LastSeen timestamp. Writes are throttled
-// to at most once per 30 seconds to reduce disk I/O.
-func (r *Registry) Touch(mac string) {
+// Touch updates the device's LastSeen timestamp and telemetry. Writes
+// are throttled to at most once per 30 seconds to reduce disk I/O,
+// unless the telemetry data has changed.
+func (r *Registry) Touch(mac string, t Telemetry) {
 	mac = normMAC(mac)
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
 	if d, ok := r.devices[mac]; ok {
 		now := time.Now().UTC()
-		if now.Sub(d.LastSeen) > 30*time.Second {
+		telemetryChanged := d.Telemetry != t
+		if telemetryChanged {
+			d.Telemetry = t
+		}
+		if telemetryChanged || now.Sub(d.LastSeen) > 30*time.Second {
 			d.LastSeen = now
 			_ = r.save()
 		}
 	}
+}
+
+// Remove deletes a device from the registry. Returns false if the
+// device is not registered.
+func (r *Registry) Remove(mac string) bool {
+	mac = normMAC(mac)
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	if _, ok := r.devices[mac]; !ok {
+		return false
+	}
+	delete(r.devices, mac)
+	_ = r.save()
+	return true
+}
+
+// SetName sets a friendly name for a device. Returns false if the
+// device is not registered.
+func (r *Registry) SetName(mac, name string) bool {
+	mac = normMAC(mac)
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	d, ok := r.devices[mac]
+	if !ok {
+		return false
+	}
+	d.Name = name
+	_ = r.save()
+	return true
+}
+
+// List returns all registered devices with API keys redacted.
+func (r *Registry) List() []*Device {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	devices := make([]*Device, 0, len(r.devices))
+	for _, d := range r.devices {
+		copy := *d
+		copy.APIKey = "***"
+		devices = append(devices, &copy)
+	}
+	return devices
 }
 
 func (r *Registry) load() error {

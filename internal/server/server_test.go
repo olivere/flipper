@@ -186,7 +186,8 @@ func TestIntegration(t *testing.T) {
 		t.Errorf("expected BMP magic bytes, got %x %x", imgData[0], imgData[1])
 	}
 
-	// Step 4: Fetch display again — same filename (no content change)
+	// Step 4: Fetch display again — still renders (no caching), but with
+	// only one image the static screen returns the same file each time.
 	req, _ = http.NewRequest("GET", ts.URL+"/api/display", nil)
 	req.Header.Set("ID", mac)
 	req.Header.Set("Access-Token", apiKey)
@@ -201,6 +202,69 @@ func TestIntegration(t *testing.T) {
 	if displayResp2["filename"] != filename {
 		t.Errorf("expected same filename %s, got %s", filename, displayResp2["filename"])
 	}
+}
+
+func TestSlideshowRotation(t *testing.T) {
+	// With multiple images, each /api/display call should return a different
+	// image because the static screen rotates on every Render() and the
+	// display handler no longer caches by key.
+	ts, cfg := setupTestServer(t)
+	defer ts.Close()
+
+	// Add a second image to the static dir (the screen re-scans on each Render).
+	createTestImage(t, filepath.Join(cfg.Screens.Static.Dir, "a.png"), 200, 100)
+
+	mac := "AA:BB:CC:DD:EE:01"
+
+	// Provision
+	req, _ := http.NewRequest("GET", ts.URL+"/api/setup", nil)
+	req.Header.Set("ID", mac)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var setupResp map[string]string
+	json.NewDecoder(resp.Body).Decode(&setupResp)
+	resp.Body.Close()
+	apiKey := setupResp["api_key"]
+
+	// First display call
+	fn1 := fetchDisplayFilename(t, ts.URL, mac, apiKey)
+	// Second display call — should be a different image
+	fn2 := fetchDisplayFilename(t, ts.URL, mac, apiKey)
+
+	if fn1 == fn2 {
+		t.Errorf("expected different filenames on consecutive calls, got %s both times", fn1)
+	}
+
+	// Third call should cycle back to the first image
+	fn3 := fetchDisplayFilename(t, ts.URL, mac, apiKey)
+	if fn3 != fn1 {
+		t.Errorf("expected rotation to cycle back: got %s, want %s", fn3, fn1)
+	}
+}
+
+func fetchDisplayFilename(t *testing.T, baseURL, mac, apiKey string) string {
+	t.Helper()
+	req, _ := http.NewRequest("GET", baseURL+"/api/display", nil)
+	req.Header.Set("ID", mac)
+	req.Header.Set("Access-Token", apiKey)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		t.Fatalf("display: expected 200, got %d: %s", resp.StatusCode, body)
+	}
+	var dr map[string]any
+	json.NewDecoder(resp.Body).Decode(&dr)
+	fn, _ := dr["filename"].(string)
+	if fn == "" {
+		t.Fatal("display: expected non-empty filename")
+	}
+	return fn
 }
 
 func TestSetupModeDisabled(t *testing.T) {

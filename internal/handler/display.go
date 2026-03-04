@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/olivere/flipper/internal/device"
 	"github.com/olivere/flipper/internal/display"
 	"github.com/olivere/flipper/internal/screen"
 )
@@ -38,24 +39,27 @@ func (h *Handler) Display(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	h.Devices.Touch(mac)
+	h.Devices.Touch(mac, device.Telemetry{
+		FirmwareVersion: r.Header.Get("FW-Version"),
+		BatteryVoltage:  r.Header.Get("Battery-Voltage"),
+		WifiRSSI:        r.Header.Get("RSSI"),
+		Model:           r.Header.Get("Model"),
+	})
 
 	// Detect device profile from headers
 	width := headerInt(r, "WIDTH", h.Config.Device.Width)
 	height := headerInt(r, "HEIGHT", h.Config.Device.Height)
 	profile := display.DetectProfile(width, height)
 
-	// Get current screen
-	scr := h.Screens.Current()
+	// Get current screen (advance if rotation is enabled)
+	var scr screen.Screen
+	if h.Config.Screens.Rotate {
+		scr = h.Screens.Next()
+	} else {
+		scr = h.Screens.Current()
+	}
 	if scr == nil {
 		http.Error(w, "no screens configured", http.StatusServiceUnavailable)
-		return
-	}
-
-	// Check cache
-	cacheKey := fmt.Sprintf("%s:%dx%d", scr.Name(), profile.Width, profile.Height)
-	if cached := h.Cache.Get(cacheKey); cached != nil {
-		writeDisplayResponse(w, r, cached, h.Config.Device.RefreshRate)
 		return
 	}
 
@@ -80,7 +84,7 @@ func (h *Handler) Display(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.Cache.Set(cacheKey, result)
+	h.Cache.Set(result)
 
 	writeDisplayResponse(w, r, result, h.Config.Device.RefreshRate)
 }

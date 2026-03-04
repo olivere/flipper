@@ -91,7 +91,7 @@ Ask the user which path:
    - Enter `https://<local-ip>:<port>` (no trailing slash)
    - Go back, select WiFi network, enter password, click Connect
    - Wait for the device to connect, then press the button to force a refresh
-   - Verify by checking `devices.json` for the device's MAC
+   - Verify by running `./bin/flipper devices` to see the device listed with its telemetry
    - If "API connection cannot be established": check macOS firewall (System Settings > Network > Firewall), verify the server is running and reachable from the network (`curl -sk https://<local-ip>:<port>/api/setup -H 'ID: test'`)
 2. **Test without device** — Simulate:
    ```bash
@@ -135,6 +135,11 @@ Setup complete!
 
 To start the server next time:
   ./bin/flipper serve [--config <path>]
+
+To manage devices:
+  ./bin/flipper devices                          # list devices + telemetry
+  ./bin/flipper devices rename <mac> <name>      # set friendly name
+  ./bin/flipper devices remove <mac>             # remove a device
 
 To add more images, drop files into <image_dir>.
 The server picks them up automatically on the next display request.

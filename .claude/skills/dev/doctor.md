@@ -120,6 +120,13 @@ Check if something is listening on the configured port first. If not, skip runti
 - FAIL: Invalid JSON
 - Repair: Show the content, offer to back up and reset.
 
+#### 16. Device list works
+- Run `./bin/flipper devices --json` and check it returns valid JSON
+- PASS: Command succeeds and returns a JSON array
+- SKIP: Binary not built or no devices registered
+- FAIL: Command errors
+- Repair: Rebuild binary (`make build`). If devices.json is corrupt, offer to back up and reset.
+
 ## Summary table format
 
 After all checks, print:

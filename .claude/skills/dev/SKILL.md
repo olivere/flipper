@@ -95,6 +95,23 @@ make build     # go build -o bin/flipper ./cmd/flipper
 make test      # go test ./...
 ```
 
+### Device management CLI
+
+```
+flipper devices                          # list devices + telemetry (table)
+flipper devices --json                   # list devices (JSON, api_key redacted)
+flipper devices rename <mac> <name>      # set friendly name
+flipper devices remove <mac>             # remove from registry
+```
+
+Telemetry (firmware version, battery voltage, WiFi RSSI, model) is captured from device headers on each `/api/display` request and stored in `devices.json`.
+
+### Config CLI
+
+```
+flipper config edit              # open config in $EDITOR (falls back to vi)
+```
+
 ### Supported image formats (input)
 
 `.png`, `.jpg`, `.jpeg`, `.bmp` — the static screen serves files from the configured directory in lexicographic order (round-robin).

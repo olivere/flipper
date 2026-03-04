@@ -47,15 +47,16 @@ func (r *Registry) Current() Screen {
 	return r.screens[r.index%len(r.screens)]
 }
 
-// Next advances to the next screen and returns it.
+// Next returns the current screen and advances to the next one.
 func (r *Registry) Next() Screen {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if len(r.screens) == 0 {
 		return nil
 	}
+	s := r.screens[r.index]
 	r.index = (r.index + 1) % len(r.screens)
-	return r.screens[r.index]
+	return s
 }
 
 func (r *Registry) Len() int {

@@ -53,7 +53,11 @@ Run `/dev setup` for an interactive guided walkthrough that handles all of the a
 
 ## Configuration
 
-Flipper reads TOML config from `~/.config/flipper/config.toml` (or pass `--config <path>`). Every field has a sensible default and can be overridden with environment variables.
+Flipper reads TOML config from `~/.config/flipper/config.toml` (or pass `--config <path>`). Every field has a sensible default and can be overridden with environment variables. To edit the config in your `$EDITOR`:
+
+```bash
+./bin/flipper config edit
+```
 
 | Setting | Config key | Env var | Default |
 |---------|-----------|---------|---------|
@@ -67,6 +71,7 @@ Flipper reads TOML config from `~/.config/flipper/config.toml` (or pass `--confi
 | Display height | `device.height` | `FLIPPER_HEIGHT` | `480` |
 | Output format | `device.format` | `FLIPPER_FORMAT` | `bmp` |
 | Refresh interval (s) | `device.refresh_rate` | `FLIPPER_REFRESH_RATE` | `900` |
+| Rotate screens | `screens.rotate` | `FLIPPER_SCREENS_ROTATE` | `false` |
 | Image directory | `screens.static.dir` | `FLIPPER_STATIC_DIR` | `~/Pictures/trmnl` |
 
 ### HTTPS
@@ -101,7 +106,31 @@ key_file  = "/path/to/key.pem"
 7. Go back, select your WiFi network, enter password, click Connect
 8. Press the device button to force an immediate refresh
 
-The device will call `/api/setup` to register, then `/api/display` to fetch its first image. Check `~/.local/share/flipper/devices.json` to confirm registration.
+The device will call `/api/setup` to register, then `/api/display` to fetch its first image. Check registration with `flipper devices`:
+
+```bash
+$ ./bin/flipper devices
+MAC                NAME         FIRMWARE  BATTERY  RSSI  MODEL  LAST SEEN
+AA:BB:CC:DD:EE:FF  —            1.7.4     4.07     -65   og     2m ago
+```
+
+### Managing devices
+
+```bash
+# List all devices (table)
+./bin/flipper devices
+
+# List all devices (JSON)
+./bin/flipper devices --json
+
+# Give a device a friendly name
+./bin/flipper devices rename AA:BB:CC:DD:EE:FF "Living Room"
+
+# Remove a device from the registry
+./bin/flipper devices remove AA:BB:CC:DD:EE:FF
+```
+
+Device telemetry (firmware version, battery voltage, WiFi RSSI, model) is captured automatically from headers sent by the device on each display request.
 
 ### Reverse proxy (advanced)
 
@@ -119,6 +148,49 @@ If you prefer to terminate TLS externally (e.g. with Caddy or nginx), disable Fl
 ### Token adoption
 
 When a TRMNL device migrates from another server (e.g. the TRMNL cloud), it may send an API key that doesn't match the one Flipper derived during setup. While `setup_mode` is enabled, Flipper automatically adopts the device's token on first contact, so devices work without manual key reconfiguration. Disable `setup_mode` after onboarding to lock down token adoption.
+
+## FAQ
+
+### Images show ghosting or overlay of previous images
+
+This is an e-ink partial refresh artifact, not a server issue. E-ink displays have two refresh modes: full refresh (flashes black/white to fully clear the screen) and partial refresh (only updates changed pixels, which leaves remnants of the previous image). The TRMNL firmware controls which mode is used — there is no server-side field to force a full refresh.
+
+Things that may help:
+
+- **Increase `refresh_rate`** — very low values like 30s are aggressive and may cause the firmware to skip full refreshes. Try 120s or higher for sustained use.
+- **Use high-contrast source images** — images with large solid areas transition more cleanly between refreshes.
+- **Press the device button** — a manual refresh typically triggers a full screen clear.
+
+### What device telemetry is available?
+
+The TRMNL device sends the following HTTP headers on each `/api/display` request:
+
+| Header | Description | Example |
+|--------|-------------|---------|
+| `Battery-Voltage` | Battery level in volts | `4.07` |
+| `FW-Version` | Firmware version | `1.7.4` |
+| `Model` | Device model identifier | — |
+| `RSSI` | WiFi signal strength (dBm) | `-65` |
+| `Refresh-Rate` | Current refresh rate (seconds) | `900` |
+| `Width` | Display width (pixels) | `800` |
+| `Height` | Display height (pixels) | `480` |
+
+The device also sends detailed log entries via `POST /api/log` including free heap size, wake reason, wifi status, and retry counts.
+
+### What `special_function` values does the firmware support?
+
+The `/api/display` response can include a `special_function` string field. Supported values:
+
+| Value | Description |
+|-------|-------------|
+| `none` | No special function (default) |
+| `identify` | Show identification screen |
+| `sleep` | Put device to sleep for 8 hours |
+| `add_wifi` | Activate WiFi captive portal |
+| `restart_playlist` | Restart playlist from first position |
+| `rewind` | Go back to previous screen |
+| `send_to_me` | Email current screen to user |
+| `guest_mode` | Switch to guest display mode |
 
 ## License
 

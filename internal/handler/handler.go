@@ -20,24 +20,17 @@ type Handler struct {
 	Logger   *slog.Logger
 }
 
-// ImageCache stores processed images in memory.
+// ImageCache stores processed images by filename so the image endpoint
+// can serve them after /api/display hands out the URL.
 type ImageCache struct {
 	mu         sync.RWMutex
-	byKey      map[string]*display.Result
 	byFilename map[string]*display.Result
 }
 
 func NewImageCache() *ImageCache {
 	return &ImageCache{
-		byKey:      make(map[string]*display.Result),
 		byFilename: make(map[string]*display.Result),
 	}
-}
-
-func (c *ImageCache) Get(key string) *display.Result {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-	return c.byKey[key]
 }
 
 func (c *ImageCache) GetByFilename(filename string) *display.Result {
@@ -46,9 +39,15 @@ func (c *ImageCache) GetByFilename(filename string) *display.Result {
 	return c.byFilename[filename]
 }
 
-func (c *ImageCache) Set(key string, result *display.Result) {
+// maxCacheEntries limits the number of processed images kept in memory.
+// When exceeded, the oldest entries are evicted by clearing the map.
+const maxCacheEntries = 64
+
+func (c *ImageCache) Set(result *display.Result) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	c.byKey[key] = result
+	if len(c.byFilename) >= maxCacheEntries {
+		clear(c.byFilename)
+	}
 	c.byFilename[result.Filename] = result
 }

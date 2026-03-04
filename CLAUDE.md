@@ -25,6 +25,11 @@ make test           # run all tests
 make setup          # go mod tidy
 ./bin/flipper serve  # start server (default :3443, HTTPS)
 ./bin/flipper serve --config ./config.toml  # custom config path
+./bin/flipper devices          # list registered devices + telemetry
+./bin/flipper devices --json   # machine-readable device list
+./bin/flipper devices rename <mac> <name>   # set friendly name
+./bin/flipper devices remove <mac>          # remove a device
+./bin/flipper config edit      # open config in $EDITOR
 ```
 
 ## TLS
@@ -41,6 +46,7 @@ TOML at `~/.config/flipper/config.toml` (or pass `--config <path>`). All fields 
 - `slog` for logging
 - No database — device state in `devices.json`, images in memory
 - Tests use `httptest` and `t.TempDir()`
+- When adding or changing CLI commands or features, update README.md, CLAUDE.md quick reference, and `.claude/skills/dev/` accordingly
 - Imports in 3 groups separated by blank lines: standard library, external, internal
 
 ```go

@@ -70,15 +70,22 @@ func defaults() Config {
 	}
 }
 
+// Path returns the resolved config file path. If path is empty, it
+// returns the default XDG location (~/.config/flipper/config.toml).
+func Path(path string) string {
+	if path == "" {
+		return filepath.Join(xdg.ConfigHome(), "flipper", "config.toml")
+	}
+	return path
+}
+
 // Load reads configuration from the TOML file at path (or
 // ~/.config/flipper/config.toml when path is empty), then applies
 // FLIPPER_* environment variable overrides on top.
 func Load(path string) (*Config, error) {
 	cfg := defaults()
 
-	if path == "" {
-		path = filepath.Join(xdg.ConfigHome(), "flipper", "config.toml")
-	}
+	path = Path(path)
 
 	if data, err := os.ReadFile(path); err == nil {
 		if err := toml.Unmarshal(data, &cfg); err != nil {
@@ -122,6 +129,11 @@ func applyEnv(cfg *Config) {
 	if v := os.Getenv("FLIPPER_REFRESH_RATE"); v != "" {
 		if n, err := strconv.Atoi(v); err == nil {
 			cfg.Device.RefreshRate = n
+		}
+	}
+	if v := os.Getenv("FLIPPER_SCREENS_ROTATE"); v != "" {
+		if b, err := strconv.ParseBool(v); err == nil {
+			cfg.Screens.Rotate = b
 		}
 	}
 	if v := os.Getenv("FLIPPER_STATIC_DIR"); v != "" {
