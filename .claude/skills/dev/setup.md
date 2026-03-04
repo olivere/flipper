@@ -6,7 +6,7 @@ Create a task list to track progress through the steps.
 
 ## Step 1: Check prerequisites
 
-- Check Go is installed and version >= 1.22 (`go version`)
+- Check Go is installed and version >= 1.26 (`go version`)
 - Check `make` is available (`make --version`)
 - If Go is missing: link to https://go.dev/dl/, offer `brew install go` on macOS
 - If make is missing: suggest Xcode command line tools on macOS (`xcode-select --install`)

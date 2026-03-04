@@ -11,7 +11,7 @@ A self-hosted display server for [TRMNL](https://usetrmnl.com) e-ink devices. Po
 
 ## Getting started
 
-You need Go 1.25+ and `make`.
+You need Go 1.26+ and `make`.
 
 ```bash
 # Build
