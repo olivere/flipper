@@ -4,9 +4,10 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/spf13/cobra"
+
 	"github.com/olivere/flipper/internal/config"
 	"github.com/olivere/flipper/internal/server"
-	"github.com/spf13/cobra"
 )
 
 func main() {

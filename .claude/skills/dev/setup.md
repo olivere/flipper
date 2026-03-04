@@ -20,14 +20,14 @@ Create a task list to track progress through the steps.
 ## Step 3: Configure
 
 Ask the user where to put the config file:
-1. **XDG path** (default): `$XDG_CONFIG_HOME/flipper/config.toml` — standard location, used automatically
+1. **Default path** (recommended): `~/.config/flipper/config.toml` — standard location, used automatically
 2. **Local**: `./config.toml` — simpler, requires `--config ./config.toml` flag
 
 Then ask about the secret key:
 1. **Generate random** (recommended): generate 32 hex chars via `openssl rand -hex 16`
 2. **Use default**: keep `change-me` (fine for local dev, warn it's insecure)
 
-Ask about listen address (default `:3000` is usually fine).
+Ask about listen address (default `:3443` is usually fine).
 
 Generate the config file with chosen values. Create the parent directory if needed.
 
@@ -68,28 +68,34 @@ Ask where to store source images (default: `~/Pictures/trmnl`).
 ## Step 5: Start server
 
 Determine the config flag needed:
-- If config is at XDG default → no flag needed
+- If config is at default path → no flag needed
 - If config is at `./config.toml` → `--config ./config.toml`
 
 Run the server in background: `./bin/flipper serve [--config <path>] &`
 
 Wait a couple seconds, then check:
 - Is the process still running? (`lsof -i :<port>` or check the PID)
-- Can we connect? Try `curl -s -o /dev/null -w '%{http_code}' -H 'ID: 00:00:00:00:00:00' http://localhost:<port>/api/setup`
+- Can we connect? Try `curl -sk -o /dev/null -w '%{http_code}' -H 'ID: 00:00:00:00:00:00' https://localhost:<port>/api/setup`
 
 If the server fails to start, show the output and help debug.
 
 ## Step 6: Provision a device
 
 Ask the user which path:
-1. **Real TRMNL device** — Guide them to:
-   - Open the device's WiFi config page
-   - Set the server URL to `http://<local-ip>:<port>`
-   - The device will call `/api/setup` on its own
-   - Verify by checking the server logs or `devices.json`
-2. **Test without device** (recommended for initial setup) — Simulate:
+1. **Real TRMNL device** — Guide them through the full connection flow:
+   - Find the local IP: `ipconfig getifaddr en0` (macOS) or `hostname -I` (Linux)
+   - IMPORTANT: TRMNL firmware requires **HTTPS**. Plain HTTP does not work. The firmware calls `setInsecure()` so self-signed certificates are accepted.
+   - Hold the device button for 5-7 seconds to enter setup mode
+   - Connect to the "TRMNL" WiFi hotspot from phone or computer
+   - In the config portal: **Advanced > Custom Server > Yes**
+   - Enter `https://<local-ip>:<port>` (no trailing slash)
+   - Go back, select WiFi network, enter password, click Connect
+   - Wait for the device to connect, then press the button to force a refresh
+   - Verify by checking `devices.json` for the device's MAC
+   - If "API connection cannot be established": check macOS firewall (System Settings > Network > Firewall), verify the server is running and reachable from the network (`curl -sk https://<local-ip>:<port>/api/setup -H 'ID: test'`)
+2. **Test without device** — Simulate:
    ```bash
-   curl -s -H "ID: AA:BB:CC:DD:EE:FF" http://localhost:<port>/api/setup
+   curl -sk -H "ID: AA:BB:CC:DD:EE:FF" https://localhost:<port>/api/setup
    ```
    Show the returned JSON. Extract and display the `api_key`.
 
@@ -98,13 +104,13 @@ Ask the user which path:
 Using the MAC and API key from the previous step:
 
 ```bash
-curl -s -H "ID: AA:BB:CC:DD:EE:FF" -H "Access-Token: <api_key>" http://localhost:<port>/api/display
+curl -sk -H "ID: AA:BB:CC:DD:EE:FF" -H "Access-Token: <api_key>" https://localhost:<port>/api/display
 ```
 
 Parse the response JSON. Extract `image_url`. Download it:
 
 ```bash
-curl -s -o /tmp/flipper-test.bmp "<image_url>"
+curl -sk -o /tmp/flipper-test.bmp "<image_url>"
 ```
 
 Verify the downloaded file:
@@ -124,7 +130,7 @@ Setup complete!
   Binary:     bin/flipper
   Config:     <config_path>
   Images:     <image_dir> (<N> images)
-  Server:     http://localhost:<port>
+  Server:     https://localhost:<port>
   Device:     <MAC> (api_key: <key_prefix>...)
 
 To start the server next time:

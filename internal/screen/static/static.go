@@ -12,9 +12,9 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/olivere/flipper/internal/screen"
-
 	_ "golang.org/x/image/bmp"
+
+	"github.com/olivere/flipper/internal/screen"
 )
 
 var supportedExts = map[string]bool{

@@ -10,7 +10,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/adrg/xdg"
+	"github.com/olivere/flipper/internal/xdg"
 )
 
 type Device struct {
@@ -28,12 +28,17 @@ type Registry struct {
 	path      string
 }
 
-func NewRegistry(secretKey string) (*Registry, error) {
-	path := filepath.Join(xdg.DataHome, "flipper", "devices.json")
+// NewRegistry creates a device registry that derives API keys from
+// secretKey. Device state is persisted to devices.json under
+// XDG_DATA_HOME. Use WithPath to override the default file location.
+func NewRegistry(secretKey string, opts ...RegistryOption) (*Registry, error) {
 	r := &Registry{
 		devices:   make(map[string]*Device),
 		secretKey: secretKey,
-		path:      path,
+		path:      filepath.Join(xdg.DataHome(), "flipper", "devices.json"),
+	}
+	for _, opt := range opts {
+		opt(r)
 	}
 	if err := r.load(); err != nil {
 		return nil, err
@@ -41,6 +46,19 @@ func NewRegistry(secretKey string) (*Registry, error) {
 	return r, nil
 }
 
+// RegistryOption configures a Registry.
+type RegistryOption func(*Registry)
+
+// WithPath overrides the default devices.json path.
+func WithPath(path string) RegistryOption {
+	return func(r *Registry) {
+		r.path = path
+	}
+}
+
+// Register adds a device by MAC address (normalized to uppercase) and
+// derives its API key from the server secret. If the device already
+// exists, its LastSeen timestamp is updated instead.
 func (r *Registry) Register(mac string) (*Device, error) {
 	mac = normMAC(mac)
 	apiKey := deriveKey(r.secretKey, mac)
@@ -68,6 +86,8 @@ func (r *Registry) Register(mac string) (*Device, error) {
 	return d, nil
 }
 
+// Authenticate returns true if mac is a registered device whose stored
+// API key matches token.
 func (r *Registry) Authenticate(mac, token string) bool {
 	mac = normMAC(mac)
 	r.mu.RLock()
@@ -80,14 +100,40 @@ func (r *Registry) Authenticate(mac, token string) bool {
 	return d.APIKey == token
 }
 
+// AdoptToken updates the stored API key for a registered device. This
+// handles devices that bring a key from a previous server (e.g. the
+// TRMNL cloud) instead of using the key Flipper derived during setup.
+// Returns true if the device exists and the token is now valid.
+func (r *Registry) AdoptToken(mac, token string) bool {
+	mac = normMAC(mac)
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	d, ok := r.devices[mac]
+	if !ok {
+		return false
+	}
+	if d.APIKey == token {
+		return true
+	}
+	d.APIKey = token
+	_ = r.save()
+	return true
+}
+
+// Touch updates the device's LastSeen timestamp. Writes are throttled
+// to at most once per 30 seconds to reduce disk I/O.
 func (r *Registry) Touch(mac string) {
 	mac = normMAC(mac)
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
 	if d, ok := r.devices[mac]; ok {
-		d.LastSeen = time.Now().UTC()
-		_ = r.save()
+		now := time.Now().UTC()
+		if now.Sub(d.LastSeen) > 30*time.Second {
+			d.LastSeen = now
+			_ = r.save()
+		}
 	}
 }
 

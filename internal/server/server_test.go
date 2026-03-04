@@ -14,6 +14,7 @@ import (
 	"testing"
 
 	"github.com/go-chi/chi/v5"
+
 	"github.com/olivere/flipper/internal/config"
 	"github.com/olivere/flipper/internal/device"
 	"github.com/olivere/flipper/internal/display"
@@ -28,11 +29,6 @@ func setupTestServer(t *testing.T) (*httptest.Server, *config.Config) {
 	// Create temp dir with a test image
 	dir := t.TempDir()
 	createTestImage(t, filepath.Join(dir, "test.png"), 100, 100)
-
-	// Override device data path
-	dataDir := t.TempDir()
-	os.Setenv("XDG_DATA_HOME", dataDir)
-	t.Cleanup(func() { os.Unsetenv("XDG_DATA_HOME") })
 
 	cfg := &config.Config{
 		Server: config.ServerConfig{
@@ -51,7 +47,8 @@ func setupTestServer(t *testing.T) (*httptest.Server, *config.Config) {
 		},
 	}
 
-	registry, err := device.NewRegistry(cfg.Server.SecretKey)
+	devicesPath := filepath.Join(t.TempDir(), "devices.json")
+	registry, err := device.NewRegistry(cfg.Server.SecretKey, device.WithPath(devicesPath))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -226,6 +223,7 @@ func TestSetupModeDisabled(t *testing.T) {
 }
 
 func TestDisplayUnauthorized(t *testing.T) {
+	// Unregistered device should get 401.
 	ts, _ := setupTestServer(t)
 	defer ts.Close()
 
@@ -240,5 +238,71 @@ func TestDisplayUnauthorized(t *testing.T) {
 
 	if resp.StatusCode != http.StatusUnauthorized {
 		t.Errorf("expected 401, got %d", resp.StatusCode)
+	}
+}
+
+func TestDisplayTokenAdoption(t *testing.T) {
+	// A registered device sending a different token should be accepted
+	// while setup_mode is enabled (migration window).
+	ts, _ := setupTestServer(t)
+	defer ts.Close()
+
+	mac := "AA:BB:CC:DD:EE:FF"
+
+	// Register the device first.
+	req, _ := http.NewRequest("GET", ts.URL+"/api/setup", nil)
+	req.Header.Set("ID", mac)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+
+	// Use a different token (simulating a device migrating from another server).
+	req, _ = http.NewRequest("GET", ts.URL+"/api/display", nil)
+	req.Header.Set("ID", mac)
+	req.Header.Set("Access-Token", "foreign-server-key")
+	resp, err = http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("expected 200 (token adopted), got %d", resp.StatusCode)
+	}
+}
+
+func TestDisplayTokenAdoptionDisabledOutsideSetupMode(t *testing.T) {
+	// Once setup_mode is off, token adoption should not happen.
+	ts, cfg := setupTestServer(t)
+	defer ts.Close()
+
+	mac := "AA:BB:CC:DD:EE:FF"
+
+	// Register the device while setup_mode is on.
+	req, _ := http.NewRequest("GET", ts.URL+"/api/setup", nil)
+	req.Header.Set("ID", mac)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+
+	// Disable setup_mode.
+	cfg.Server.SetupMode = false
+
+	// A different token should now be rejected.
+	req, _ = http.NewRequest("GET", ts.URL+"/api/display", nil)
+	req.Header.Set("ID", mac)
+	req.Header.Set("Access-Token", "foreign-server-key")
+	resp, err = http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusUnauthorized {
+		t.Errorf("expected 401 (adoption disabled), got %d", resp.StatusCode)
 	}
 }

@@ -10,6 +10,7 @@ import (
 	"github.com/olivere/flipper/internal/screen"
 )
 
+// Handler holds the shared dependencies for all HTTP handlers.
 type Handler struct {
 	Config   *config.Config
 	Devices  *device.Registry

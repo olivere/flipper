@@ -1,19 +1,22 @@
-.PHONY: install setup build test image
+.PHONY: help install setup build test image
 
 BIN := bin/flipper
 MODULE := github.com/olivere/flipper
 
-install:
+help: ## Show available targets
+	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  %-12s %s\n", $$1, $$2}'
+
+install: ## Install flipper to $GOPATH/bin
 	go install ./cmd/flipper
 
-setup:
+setup: ## Tidy module dependencies
 	go mod tidy
 
-build:
+build: ## Build to bin/flipper
 	go build -o $(BIN) ./cmd/flipper
 
-test:
+test: ## Run all tests
 	go test ./...
 
-image:
+image: ## Build Docker image
 	docker build -t flipper .

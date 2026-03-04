@@ -26,6 +26,7 @@ type Registry struct {
 	index   int
 }
 
+// NewRegistry returns an empty screen registry.
 func NewRegistry() *Registry {
 	return &Registry{}
 }

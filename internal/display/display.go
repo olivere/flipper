@@ -24,6 +24,8 @@ var (
 	ProfileX        = DeviceProfile{Width: 1872, Height: 1404}
 )
 
+// DetectProfile returns the device profile matching the given display
+// dimensions. Unrecognized sizes default to ProfileOriginal (800×480).
 func DetectProfile(width, height int) DeviceProfile {
 	if width == ProfileX.Width && height == ProfileX.Height {
 		return ProfileX
@@ -34,6 +36,7 @@ func DetectProfile(width, height int) DeviceProfile {
 // Pipeline processes images for TRMNL devices.
 type Pipeline struct{}
 
+// NewPipeline returns a new image processing pipeline.
 func NewPipeline() *Pipeline {
 	return &Pipeline{}
 }

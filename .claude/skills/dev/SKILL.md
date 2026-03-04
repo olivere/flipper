@@ -31,19 +31,24 @@ Commands:
 | What | Default location | Override |
 |------|-----------------|----------|
 | Binary | `bin/flipper` | Build output |
-| Config | `$XDG_CONFIG_HOME/flipper/config.toml` | `--config <path>` flag |
-| Device data | `$XDG_DATA_HOME/flipper/devices.json` | `XDG_DATA_HOME` env var |
+| Config | `~/.config/flipper/config.toml` | `--config <path>` flag |
+| Device data | `~/.local/share/flipper/devices.json` | `XDG_DATA_HOME` env var |
 | Image source | `~/Pictures/trmnl` | `screens.static.dir` in config |
 
-On macOS, XDG defaults: config = `~/Library/Application Support`, data = `~/Library/Application Support`.
+XDG defaults: config = `~/.config`, data = `~/.local/share`. Override with `XDG_CONFIG_HOME` / `XDG_DATA_HOME`.
 
 ### Config format (TOML)
 
 ```toml
 [server]
-addr       = ":3000"
+addr       = ":3443"
 secret_key = "change-me"
 setup_mode = true
+
+[server.tls]
+disabled  = false           # set true for plain HTTP
+# cert_file = "cert.pem"   # optional: custom cert
+# key_file  = "key.pem"    # optional: custom key
 
 [device]
 width        = 800
@@ -58,7 +63,7 @@ rotate = false
 dir = "~/Pictures/trmnl"
 ```
 
-Environment variable overrides: `FLIPPER_ADDR`, `FLIPPER_SECRET_KEY`, `FLIPPER_SETUP_MODE`, `FLIPPER_WIDTH`, `FLIPPER_HEIGHT`, `FLIPPER_FORMAT`, `FLIPPER_REFRESH_RATE`, `FLIPPER_STATIC_DIR`.
+Environment variable overrides: `FLIPPER_ADDR`, `FLIPPER_SECRET_KEY`, `FLIPPER_SETUP_MODE`, `FLIPPER_TLS_DISABLED`, `FLIPPER_TLS_CERT_FILE`, `FLIPPER_TLS_KEY_FILE`, `FLIPPER_WIDTH`, `FLIPPER_HEIGHT`, `FLIPPER_FORMAT`, `FLIPPER_REFRESH_RATE`, `FLIPPER_STATIC_DIR`.
 
 ### Device protocol
 
@@ -93,6 +98,15 @@ make test      # go test ./...
 ### Supported image formats (input)
 
 `.png`, `.jpg`, `.jpeg`, `.bmp` — the static screen serves files from the configured directory in lexicographic order (round-robin).
+
+### TRMNL device requirements
+
+- TRMNL firmware requires **HTTPS** — plain HTTP does not work
+- The firmware calls `setInsecure()` on WiFiClientSecure, so **self-signed certificates are accepted**
+- Device URL format: `https://<local-ip>:3443` (no trailing slash)
+- To enter setup mode: hold the device button for 5-7 seconds
+- In the WiFi portal: **Advanced > Custom Server > Yes**, then enter the URL
+- Press the button once to force an immediate connection attempt
 
 ### No health endpoint
 

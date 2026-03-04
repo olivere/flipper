@@ -2,13 +2,16 @@ package config
 
 import (
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 
 	"github.com/BurntSushi/toml"
-	"github.com/adrg/xdg"
+
+	"github.com/olivere/flipper/internal/xdg"
 )
 
 type Config struct {
@@ -18,9 +21,16 @@ type Config struct {
 }
 
 type ServerConfig struct {
-	Addr      string `toml:"addr"`
-	SecretKey string `toml:"secret_key"`
-	SetupMode bool   `toml:"setup_mode"`
+	Addr      string    `toml:"addr"`
+	SecretKey string    `toml:"secret_key"`
+	SetupMode bool      `toml:"setup_mode"`
+	TLS       TLSConfig `toml:"tls"`
+}
+
+type TLSConfig struct {
+	Disabled bool   `toml:"disabled"`
+	CertFile string `toml:"cert_file"`
+	KeyFile  string `toml:"key_file"`
 }
 
 type DeviceConfig struct {
@@ -42,7 +52,7 @@ type StaticScreenConfig struct {
 func defaults() Config {
 	return Config{
 		Server: ServerConfig{
-			Addr:      ":3000",
+			Addr:      ":3443",
 			SecretKey: "change-me",
 			SetupMode: true,
 		},
@@ -60,11 +70,14 @@ func defaults() Config {
 	}
 }
 
+// Load reads configuration from the TOML file at path (or
+// ~/.config/flipper/config.toml when path is empty), then applies
+// FLIPPER_* environment variable overrides on top.
 func Load(path string) (*Config, error) {
 	cfg := defaults()
 
 	if path == "" {
-		path = filepath.Join(xdg.ConfigHome, "flipper", "config.toml")
+		path = filepath.Join(xdg.ConfigHome(), "flipper", "config.toml")
 	}
 
 	if data, err := os.ReadFile(path); err == nil {
@@ -75,6 +88,8 @@ func Load(path string) (*Config, error) {
 
 	applyEnv(&cfg)
 	cfg.Screens.Static.Dir = expandHome(cfg.Screens.Static.Dir)
+
+	checkMacOSMigration(path)
 
 	return &cfg, nil
 }
@@ -87,7 +102,9 @@ func applyEnv(cfg *Config) {
 		cfg.Server.SecretKey = v
 	}
 	if v := os.Getenv("FLIPPER_SETUP_MODE"); v != "" {
-		cfg.Server.SetupMode = v == "true" || v == "1"
+		if b, err := strconv.ParseBool(v); err == nil {
+			cfg.Server.SetupMode = b
+		}
 	}
 	if v := os.Getenv("FLIPPER_WIDTH"); v != "" {
 		if n, err := strconv.Atoi(v); err == nil {
@@ -110,6 +127,17 @@ func applyEnv(cfg *Config) {
 	if v := os.Getenv("FLIPPER_STATIC_DIR"); v != "" {
 		cfg.Screens.Static.Dir = v
 	}
+	if v := os.Getenv("FLIPPER_TLS_DISABLED"); v != "" {
+		if b, err := strconv.ParseBool(v); err == nil {
+			cfg.Server.TLS.Disabled = b
+		}
+	}
+	if v := os.Getenv("FLIPPER_TLS_CERT_FILE"); v != "" {
+		cfg.Server.TLS.CertFile = v
+	}
+	if v := os.Getenv("FLIPPER_TLS_KEY_FILE"); v != "" {
+		cfg.Server.TLS.KeyFile = v
+	}
 }
 
 func expandHome(path string) string {
@@ -119,4 +147,35 @@ func expandHome(path string) string {
 		}
 	}
 	return path
+}
+
+// checkMacOSMigration logs a warning if the old macOS config path exists
+// but the new XDG path does not, helping users migrate.
+func checkMacOSMigration(activePath string) {
+	if runtime.GOOS != "darwin" {
+		return
+	}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return
+	}
+
+	oldPath := filepath.Join(home, "Library", "Application Support", "flipper", "config.toml")
+	newPath := filepath.Join(xdg.ConfigHome(), "flipper", "config.toml")
+
+	if oldPath == activePath || newPath == activePath {
+		return
+	}
+
+	if _, err := os.Stat(oldPath); err != nil {
+		return
+	}
+	if _, err := os.Stat(newPath); err == nil {
+		return
+	}
+
+	slog.Warn("found config at old macOS path; consider moving it",
+		"old", oldPath,
+		"new", newPath,
+	)
 }

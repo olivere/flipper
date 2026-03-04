@@ -30,8 +30,12 @@ func (h *Handler) Display(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if !h.Devices.Authenticate(mac, token) {
-		http.Error(w, "unauthorized", http.StatusUnauthorized)
-		return
+		// Device may be sending a token from a previous server.
+		// Only adopt tokens while setup_mode is active (migration window).
+		if !h.Config.Server.SetupMode || !h.Devices.AdoptToken(mac, token) {
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			return
+		}
 	}
 
 	h.Devices.Touch(mac)
@@ -83,7 +87,7 @@ func (h *Handler) Display(w http.ResponseWriter, r *http.Request) {
 
 func writeDisplayResponse(w http.ResponseWriter, r *http.Request, result *display.Result, refreshRate int) {
 	scheme := "http"
-	if r.TLS != nil {
+	if r.TLS != nil || r.Header.Get("X-Forwarded-Proto") == "https" {
 		scheme = "https"
 	}
 	host := r.Host

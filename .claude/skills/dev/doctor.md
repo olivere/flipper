@@ -40,7 +40,7 @@ Run all checks, collect results, then print a summary table. For each failure: e
 ### Configuration
 
 #### 5. Config file exists
-- Check for config in order: `./config.toml`, then `$XDG_CONFIG_HOME/flipper/config.toml`
+- Check for config in order: `./config.toml`, then `~/.config/flipper/config.toml`
 - Also check if `FLIPPER_ADDR` or `FLIPPER_SECRET_KEY` env vars are set (user might be using env-only config)
 - PASS: Config file found (report which path)
 - WARN: No config file but env vars are set
@@ -79,13 +79,13 @@ Run all checks, collect results, then print a summary table. For each failure: e
 Check if something is listening on the configured port first. If not, skip runtime checks and note that the server isn't running.
 
 #### 10. Server is listening
-- Check with `lsof -i :<port>` or `curl -s -o /dev/null -w '%{http_code}' http://localhost:<port>/api/setup -H 'ID: 00:00:00:00:00:00'`
+- Check with `lsof -i :<port>` or `curl -sk -o /dev/null -w '%{http_code}' https://localhost:<port>/api/setup -H 'ID: 00:00:00:00:00:00'`
 - PASS: Server responds
 - SKIP: Server not running (not an error — just note it)
 - Repair: Offer to start it.
 
 #### 11. Setup endpoint responds
-- `curl -s -H 'ID: 00:00:00:00:00:00' http://localhost:<port>/api/setup`
+- `curl -sk -H 'ID: 00:00:00:00:00:00' https://localhost:<port>/api/setup`
 - PASS: Returns JSON with `api_key`
 - WARN: Returns 403 (setup_mode is disabled — not necessarily wrong)
 - FAIL: Error or unexpected response
@@ -108,13 +108,13 @@ Check if something is listening on the configured port first. If not, skip runti
 ### Data
 
 #### 14. Data directory is writable
-- Check `$XDG_DATA_HOME/flipper/` exists and is writable
+- Check `~/.local/share/flipper/` exists and is writable
 - PASS: Directory exists and is writable
 - FAIL: Missing or not writable
 - Repair: Create directory or fix permissions.
 
 #### 15. Devices file is valid
-- If `$XDG_DATA_HOME/flipper/devices.json` exists, check it's valid JSON
+- If `~/.local/share/flipper/devices.json` exists, check it's valid JSON
 - PASS: Valid JSON array
 - SKIP: File doesn't exist (no devices registered yet — that's fine)
 - FAIL: Invalid JSON
@@ -142,7 +142,7 @@ Configuration
   [PASS] Image directory has 3 images
 
 Runtime
-  [PASS] Server listening on :3000
+  [PASS] Server listening on :3443
   [PASS] Setup endpoint responds
   [PASS] Display endpoint works
   [PASS] Image URL downloadable

@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"crypto/tls"
 	"errors"
 	"log/slog"
 	"net/http"
@@ -12,14 +13,20 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+
 	"github.com/olivere/flipper/internal/config"
 	"github.com/olivere/flipper/internal/device"
 	"github.com/olivere/flipper/internal/display"
 	"github.com/olivere/flipper/internal/handler"
 	"github.com/olivere/flipper/internal/screen"
 	"github.com/olivere/flipper/internal/screen/static"
+	"github.com/olivere/flipper/internal/selfcert"
 )
 
+// Run wires up the device registry, screen registry, image pipeline,
+// and HTTP routes, then starts the server. It blocks until ctx is
+// cancelled or an OS signal (SIGINT, SIGTERM) is received, then shuts
+// down gracefully with a 5-second timeout.
 func Run(ctx context.Context, cfg *config.Config) error {
 	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
 
@@ -65,12 +72,30 @@ func Run(ctx context.Context, cfg *config.Config) error {
 		Handler: r,
 	}
 
+	tlsCfg := cfg.Server.TLS
+	useTLS := !tlsCfg.Disabled
+
+	if useTLS && tlsCfg.CertFile == "" && tlsCfg.KeyFile == "" {
+		cert, err := selfcert.Generate()
+		if err != nil {
+			return err
+		}
+		srv.TLSConfig = &tls.Config{
+			Certificates: []tls.Certificate{cert},
+		}
+	}
+
 	ctx, stop := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
+	serve := srv.ListenAndServe
+	if useTLS {
+		serve = func() error { return srv.ListenAndServeTLS(tlsCfg.CertFile, tlsCfg.KeyFile) }
+	}
+
+	logger.Info("server starting", "addr", cfg.Server.Addr, "tls", useTLS)
 	go func() {
-		logger.Info("server starting", "addr", cfg.Server.Addr)
-		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+		if err := serve(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			logger.Error("server error", "err", err)
 			os.Exit(1)
 		}
