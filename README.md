@@ -192,6 +192,87 @@ The `/api/display` response can include a `special_function` string field. Suppo
 | `send_to_me` | Email current screen to user |
 | `guest_mode` | Switch to guest display mode |
 
+### Running as a system service
+
+#### macOS (launchd)
+
+Create `~/Library/LaunchAgents/com.olivere.flipper.plist`:
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.olivere.flipper</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/usr/local/bin/flipper</string>
+        <string>serve</string>
+    </array>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+    <key>StandardOutPath</key>
+    <string>/tmp/flipper.log</string>
+    <key>StandardErrorPath</key>
+    <string>/tmp/flipper.log</string>
+</dict>
+</plist>
+```
+
+Adjust the path to the `flipper` binary as needed. Then:
+
+```bash
+# Install and start
+launchctl load ~/Library/LaunchAgents/com.olivere.flipper.plist
+
+# Stop and uninstall
+launchctl unload ~/Library/LaunchAgents/com.olivere.flipper.plist
+
+# Check status
+launchctl list | grep flipper
+```
+
+#### Linux (systemd)
+
+Create `~/.config/systemd/user/flipper.service`:
+
+```ini
+[Unit]
+Description=Flipper TRMNL display server
+After=network.target
+
+[Service]
+ExecStart=/usr/local/bin/flipper serve
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target
+```
+
+Adjust the path to the `flipper` binary as needed. Then:
+
+```bash
+# Install and start
+systemctl --user daemon-reload
+systemctl --user enable --now flipper
+
+# Stop
+systemctl --user stop flipper
+
+# Uninstall
+systemctl --user disable --now flipper
+
+# Check status / logs
+systemctl --user status flipper
+journalctl --user -u flipper -f
+```
+
+> **Using Claude Code?** Run `/dev daemon install` to generate and install the service file automatically, or `/dev daemon uninstall` to remove it.
+
 ## License
 
 Copyright (c) 2026 Oliver Eilhard. All rights reserved. See [LICENSE](LICENSE).

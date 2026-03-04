@@ -12,6 +12,7 @@ Route on `$ARGUMENTS`:
 
 - If `$ARGUMENTS` starts with `setup` → Read and follow `.claude/skills/dev/setup.md`
 - If `$ARGUMENTS` starts with `doctor` → Read and follow `.claude/skills/dev/doctor.md`
+- If `$ARGUMENTS` starts with `daemon` → Read and follow `.claude/skills/dev/daemon.md`
 - Otherwise → Print usage:
 
 ```
@@ -20,6 +21,7 @@ Usage: /dev <command>
 Commands:
   setup    Interactive guided walkthrough from zero to "image on device"
   doctor   Diagnostic sweep — checks everything works, offers repair when it doesn't
+  daemon   Manage Flipper as a system service (install, uninstall, start, stop, status, logs)
 ```
 
 ---
