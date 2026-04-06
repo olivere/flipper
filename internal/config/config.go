@@ -15,9 +15,10 @@ import (
 )
 
 type Config struct {
-	Server  ServerConfig  `toml:"server"`
-	Device  DeviceConfig  `toml:"device"`
-	Screens ScreensConfig `toml:"screens"`
+	Server   ServerConfig    `toml:"server"`
+	Device   DeviceConfig    `toml:"device"`
+	Screens  ScreensConfig   `toml:"screens"`
+	Playlist []PlaylistEntry `toml:"playlist"`
 }
 
 type ServerConfig struct {
@@ -43,10 +44,24 @@ type DeviceConfig struct {
 type ScreensConfig struct {
 	Rotate bool               `toml:"rotate"`
 	Static StaticScreenConfig `toml:"static"`
+	Demo   DemoScreenConfig   `toml:"demo"`
 }
 
 type StaticScreenConfig struct {
 	Dir string `toml:"dir"`
+}
+
+type DemoScreenConfig struct {
+	Enabled bool `toml:"enabled"`
+}
+
+// PlaylistEntry defines a single entry in the playlist. When the
+// playlist is non-empty, it drives screen ordering instead of the
+// registry's round-robin rotation.
+type PlaylistEntry struct {
+	Screen   string         `toml:"screen"`
+	Duration string         `toml:"duration"` // e.g. "2m", "60s"; empty = use device.refresh_rate
+	Params   map[string]any `toml:"params"`
 }
 
 func defaults() Config {

@@ -51,9 +51,17 @@ func (h *Handler) Display(w http.ResponseWriter, r *http.Request) {
 	height := headerInt(r, "HEIGHT", h.Config.Device.Height)
 	profile := display.DetectProfile(width, height)
 
-	// Get current screen (advance if rotation is enabled)
+	// Get current screen: playlist takes priority, then registry rotation.
 	var scr screen.Screen
-	if h.Config.Screens.Rotate {
+	refreshRate := h.Config.Device.RefreshRate
+
+	if h.Playlist != nil && h.Playlist.Len() > 0 {
+		s, dur := h.Playlist.Next()
+		scr = s
+		if dur > 0 {
+			refreshRate = int(dur.Seconds())
+		}
+	} else if h.Config.Screens.Rotate {
 		scr = h.Screens.Next()
 	} else {
 		scr = h.Screens.Current()
@@ -65,9 +73,10 @@ func (h *Handler) Display(w http.ResponseWriter, r *http.Request) {
 
 	// Render
 	opts := screen.RenderOpts{
-		Width:   profile.Width,
-		Height:  profile.Height,
-		Scaling: "fit",
+		Width:     profile.Width,
+		Height:    profile.Height,
+		Scaling:   "fit",
+		ColorMode: profile.ColorMode,
 	}
 	img, err := scr.Render(r.Context(), opts)
 	if err != nil {
@@ -86,7 +95,7 @@ func (h *Handler) Display(w http.ResponseWriter, r *http.Request) {
 
 	h.Cache.Set(result)
 
-	writeDisplayResponse(w, r, result, h.Config.Device.RefreshRate)
+	writeDisplayResponse(w, r, result, refreshRate)
 }
 
 func writeDisplayResponse(w http.ResponseWriter, r *http.Request, result *display.Result, refreshRate int) {

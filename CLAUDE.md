@@ -11,7 +11,8 @@ internal/
   device/           Device registry (MAC auth, devices.json)
   display/          Image pipeline (resize, grayscale, dither, encode)
   handler/          HTTP handlers (setup, display, images, log)
-  screen/           Screen interface + static screen implementation
+  layout/           Layout system for programmatic screen rendering (fogleman/gg)
+  screen/           Screen interface, playlist, implementations (static, demo, weather, hackernews, news, fcbayern)
   selfcert/         Self-signed TLS certificate generation
   server/           Wires everything, runs HTTP server
   xdg/              XDG Base Directory paths (~/.config, ~/.local/share)

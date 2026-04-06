@@ -15,6 +15,7 @@ type Handler struct {
 	Config   *config.Config
 	Devices  *device.Registry
 	Screens  *screen.Registry
+	Playlist *screen.Playlist
 	Pipeline *display.Pipeline
 	Cache    *ImageCache
 	Logger   *slog.Logger
