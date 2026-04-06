@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/tls"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
@@ -61,6 +62,7 @@ func Run(ctx context.Context, cfg *config.Config) error {
 	r := chi.NewRouter()
 	r.Use(middleware.Recoverer)
 	r.Use(middleware.RealIP)
+	r.Use(requestLogger(logger))
 
 	r.Get("/api/setup", h.Setup)
 	r.Get("/api/display", h.Display)
@@ -108,4 +110,21 @@ func Run(ctx context.Context, cfg *config.Config) error {
 	shutCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	return srv.Shutdown(shutCtx)
+}
+
+func requestLogger(logger *slog.Logger) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			start := time.Now()
+			ww := middleware.NewWrapResponseWriter(w, r.ProtoMajor)
+			next.ServeHTTP(ww, r)
+			logger.Info(fmt.Sprintf("%s %s", r.Method, r.URL.Path),
+				"status", ww.Status(),
+				"bytes", ww.BytesWritten(),
+				"duration", time.Since(start).String(),
+				"from", r.RemoteAddr,
+				"id", r.Header.Get("ID"),
+			)
+		})
+	}
 }

@@ -214,6 +214,8 @@ Create `~/Library/LaunchAgents/com.olivere.flipper.plist`:
     <true/>
     <key>KeepAlive</key>
     <true/>
+    <key>ProcessType</key>
+    <string>Interactive</string>
     <key>StandardOutPath</key>
     <string>/tmp/flipper.log</string>
     <key>StandardErrorPath</key>
@@ -221,6 +223,10 @@ Create `~/Library/LaunchAgents/com.olivere.flipper.plist`:
 </dict>
 </plist>
 ```
+
+`ProcessType: Interactive` prevents macOS App Nap from throttling the server
+when the display sleeps. Without it, image processing can exceed the device's
+read timeout.
 
 Adjust the path to the `flipper` binary as needed. Then:
 

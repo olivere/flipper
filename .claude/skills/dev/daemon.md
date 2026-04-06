@@ -64,6 +64,8 @@ Convert to absolute path before writing the service file.
     <true/>
     <key>KeepAlive</key>
     <true/>
+    <key>ProcessType</key>
+    <string>Interactive</string>
     <key>StandardOutPath</key>
     <string>/tmp/flipper.log</string>
     <key>StandardErrorPath</key>
