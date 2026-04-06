@@ -18,11 +18,11 @@ func testImage(w, h int) image.Image {
 	return img
 }
 
-func TestProcessOriginal(t *testing.T) {
+func TestProcessOG(t *testing.T) {
 	p := NewPipeline()
 	src := testImage(1024, 768)
 
-	result, err := p.Process(src, ProfileOriginal, "fit")
+	result, err := p.Process(src, ProfileOG, "fit")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -42,11 +42,11 @@ func TestProcessOriginal(t *testing.T) {
 	}
 }
 
-func TestProcessOriginalFill(t *testing.T) {
+func TestProcessOGFill(t *testing.T) {
 	p := NewPipeline()
 	src := testImage(1024, 768)
 
-	result, err := p.Process(src, ProfileOriginal, "fill")
+	result, err := p.Process(src, ProfileOG, "fill")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -85,11 +85,11 @@ func TestDeterministicHash(t *testing.T) {
 	p := NewPipeline()
 	src := testImage(200, 200)
 
-	r1, err := p.Process(src, ProfileOriginal, "fit")
+	r1, err := p.Process(src, ProfileOG, "fit")
 	if err != nil {
 		t.Fatal(err)
 	}
-	r2, err := p.Process(src, ProfileOriginal, "fit")
+	r2, err := p.Process(src, ProfileOG, "fit")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -107,10 +107,10 @@ func TestDetectProfile(t *testing.T) {
 		w, h    int
 		want    DeviceProfile
 	}{
-		{800, 480, ProfileOriginal},
+		{800, 480, ProfileOG},
 		{1872, 1404, ProfileX},
-		{0, 0, ProfileOriginal},   // default
-		{100, 100, ProfileOriginal}, // unknown defaults to original
+		{0, 0, ProfileOG},   // default
+		{100, 100, ProfileOG}, // unknown defaults to original
 	}
 	for _, tt := range tests {
 		got := DetectProfile(tt.w, tt.h)

@@ -13,24 +13,34 @@ import (
 	"github.com/makeworld-the-better-one/dither/v2"
 )
 
+// ColorMode describes a device's color capabilities.
+type ColorMode int
+
+const (
+	ColorBW    ColorMode = iota // 1-bit black & white (TRMNL OG)
+	ColorGray4                  // 4-level grayscale (TRMNL X)
+)
+
 // DeviceProfile describes a TRMNL device's display capabilities.
 type DeviceProfile struct {
-	Width  int
-	Height int
+	Name      string
+	Width     int
+	Height    int
+	ColorMode ColorMode
 }
 
 var (
-	ProfileOriginal = DeviceProfile{Width: 800, Height: 480}
-	ProfileX        = DeviceProfile{Width: 1872, Height: 1404}
+	ProfileOG = DeviceProfile{Name: "OG", Width: 800, Height: 480, ColorMode: ColorBW}
+	ProfileX  = DeviceProfile{Name: "X", Width: 1872, Height: 1404, ColorMode: ColorGray4}
 )
 
 // DetectProfile returns the device profile matching the given display
-// dimensions. Unrecognized sizes default to ProfileOriginal (800×480).
+// dimensions. Unrecognized sizes default to ProfileOG (800×480).
 func DetectProfile(width, height int) DeviceProfile {
 	if width == ProfileX.Width && height == ProfileX.Height {
 		return ProfileX
 	}
-	return ProfileOriginal
+	return ProfileOG
 }
 
 // Pipeline processes images for TRMNL devices.
@@ -79,7 +89,7 @@ func (p *Pipeline) Process(src image.Image, profile DeviceProfile, scaling strin
 	sharpened := imaging.Sharpen(adjusted, 0.5)
 
 	// Dither and encode based on profile
-	if profile == ProfileX {
+	if profile.ColorMode == ColorGray4 {
 		return encodeX(sharpened)
 	}
 	return encodeOriginal(sharpened)

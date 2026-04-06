@@ -9,6 +9,8 @@ A self-hosted display server for [TRMNL](https://usetrmnl.com) e-ink devices. Po
 3. Your TRMNL device fetches the next image on each refresh cycle
 4. Images rotate in order, no cloud service needed
 
+Flipper supports TRMNL OG (800×480, B&W) and TRMNL X (1872×1404, grayscale) devices. Device capabilities are detected automatically from request headers.
+
 ## Getting started
 
 You need Go 1.26+ and `make`.
@@ -73,6 +75,39 @@ Flipper reads TOML config from `~/.config/flipper/config.toml` (or pass `--confi
 | Refresh interval (s) | `device.refresh_rate` | `FLIPPER_REFRESH_RATE` | `900` |
 | Rotate screens | `screens.rotate` | `FLIPPER_SCREENS_ROTATE` | `false` |
 | Image directory | `screens.static.dir` | `FLIPPER_STATIC_DIR` | `~/Pictures/trmnl` |
+| Demo screen | `screens.demo.enabled` | — | `false` |
+
+### Playlist
+
+A playlist defines the order and timing of screens shown on the device. When a `[[playlist]]` section is present in the config, it replaces the `screens.rotate` behavior. Each entry specifies a screen type, an optional duration, and optional parameters.
+
+```toml
+[[playlist]]
+screen = "news"
+duration = "2m"
+
+[[playlist]]
+screen = "static"
+duration = "60s"
+
+[[playlist]]
+screen = "weather"
+duration = "2m"
+params.city = "Munich"
+params.forecast_days = 7
+
+[[playlist]]
+screen = "hackernews"
+duration = "60s"
+```
+
+| Field | Description |
+|-------|-------------|
+| `screen` | Screen type: `static`, `demo`, `weather`, `hackernews`, `news`, `fcbayern` |
+| `duration` | How long to show this screen (e.g. `60s`, `2m`). Optional — defaults to `device.refresh_rate` |
+| `params.*` | Screen-specific parameters (e.g. `params.city` for weather) |
+
+The same screen type can appear multiple times with different parameters (e.g. weather for different cities). Unknown screen types are skipped with a warning. When no playlist is defined, the existing `screens.rotate` behavior applies.
 
 ### HTTPS
 

@@ -14,8 +14,19 @@ import (
 
 	_ "golang.org/x/image/bmp"
 
+	"github.com/olivere/flipper/internal/config"
 	"github.com/olivere/flipper/internal/screen"
 )
+
+func init() {
+	screen.Register("static", func(cfg *config.Config, _ map[string]any) (screen.Screen, error) {
+		dir := cfg.Screens.Static.Dir
+		if dir == "" {
+			return nil, fmt.Errorf("static screen: no directory configured")
+		}
+		return New(dir)
+	})
+}
 
 var supportedExts = map[string]bool{
 	".png":  true,

@@ -1,6 +1,6 @@
 ---
 name: dev
-description: "Development helper: `/dev setup` guides you from zero to image-on-device, `/dev doctor` diagnoses and repairs your environment"
+description: "Development helper: `/dev setup` guides you from zero to image-on-device, `/dev doctor` diagnoses and repairs your environment, and `/dev daemon` installs, uninstalls, and does status checks for the flipper daemon running in the background."
 argument-hint: <setup|doctor|daemon>
 disable-model-invocation: true
 allowed-tools: Bash, Read, Write, Edit, Glob, Grep, WebSearch, WebFetch, AskUserQuestion, TaskCreate, TaskUpdate, TaskList
