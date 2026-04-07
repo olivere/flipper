@@ -4,11 +4,17 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"strconv"
 	"time"
 )
+
+// Fetcher retrieves weather data for a location.
+type Fetcher interface {
+	Fetch(ctx context.Context, loc Location, forecastDays int, units string) (*WeatherData, error)
+}
 
 // Client talks to the Open-Meteo API for geocoding and weather forecasts.
 type Client struct {
@@ -68,11 +74,13 @@ func (c *Client) Geocode(ctx context.Context, city string) (Location, error) {
 
 	resp, err := c.http.Do(req)
 	if err != nil {
+		slog.Warn("geocode request failed", "url", u, "error", err)
 		return Location{}, fmt.Errorf("geocode fetch: %w", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
+		slog.Warn("geocode unexpected status", "url", u, "status", resp.StatusCode)
 		return Location{}, fmt.Errorf("geocode: status %d", resp.StatusCode)
 	}
 
@@ -124,11 +132,13 @@ func (c *Client) Fetch(ctx context.Context, loc Location, forecastDays int, unit
 
 	resp, err := c.http.Do(req)
 	if err != nil {
+		slog.Warn("forecast request failed", "url", u, "error", err)
 		return nil, fmt.Errorf("forecast fetch: %w", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
+		slog.Warn("forecast unexpected status", "url", u, "status", resp.StatusCode)
 		return nil, fmt.Errorf("forecast: status %d", resp.StatusCode)
 	}
 

@@ -36,6 +36,7 @@ func init() {
 			ForecastDays:    screen.ParamInt(params, "forecast_days", 5),
 			Units:           screen.ParamString(params, "units", "metric"),
 			Locale:          screen.ParamString(params, "locale", "en"),
+			Service:         screen.ParamString(params, "service", "openmeteo"),
 			RefreshInterval: refreshInterval,
 		}), nil
 	})
@@ -49,23 +50,33 @@ type Config struct {
 	ForecastDays    int
 	Units           string
 	Locale          string
+	Service         string // "openmeteo" (default) or "brightsky"
 	RefreshInterval time.Duration
 }
 
 // Screen renders weather information for a configured city.
 type Screen struct {
-	cfg    Config
-	client *Client
-	mu     sync.Mutex
-	loc    *Location
-	cache  *WeatherData
-	expiry time.Time
+	cfg     Config
+	client  *Client  // shared client for geocoding
+	fetcher Fetcher  // weather data fetcher (service-specific)
+	mu      sync.Mutex
+	loc     *Location
+	cache   *WeatherData
+	expiry  time.Time
 }
 
 func New(cfg Config) *Screen {
+	client := NewClient()
+	var fetcher Fetcher
+	if cfg.Service == "brightsky" {
+		fetcher = NewBrightSkyClient()
+	} else {
+		fetcher = client
+	}
 	return &Screen{
-		cfg:    cfg,
-		client: NewClient(),
+		cfg:     cfg,
+		client:  client,
+		fetcher: fetcher,
 	}
 }
 
@@ -102,6 +113,7 @@ func (s *Screen) getData(ctx context.Context) (*WeatherData, error) {
 				cached := s.cache
 				s.mu.Unlock()
 				if cached != nil {
+					slog.Warn("geocode failed, using cache", "city", s.cfg.City, "error", err)
 					return cached, nil
 				}
 				return nil, fmt.Errorf("geocode %q: %w", s.cfg.City, err)
@@ -114,7 +126,7 @@ func (s *Screen) getData(ctx context.Context) (*WeatherData, error) {
 	s.mu.Unlock()
 
 	// Fetch outside the lock so concurrent renders aren't blocked.
-	data, err := s.client.Fetch(ctx, loc, s.cfg.ForecastDays+1, s.cfg.Units)
+	data, err := s.fetcher.Fetch(ctx, loc, s.cfg.ForecastDays+1, s.cfg.Units)
 	if err != nil {
 		if cached != nil {
 			slog.Warn("weather fetch failed, using cache", "city", s.cfg.City, "error", err)
