@@ -14,6 +14,7 @@ setup: ## Tidy module dependencies
 
 build: ## Build to bin/flipper
 	go build -o $(BIN) ./cmd/flipper
+	codesign -s "Developer ID Application: Oliver Eilhard (BSWQ3M7W67)" -f $(BIN)
 
 test: ## Run all tests
 	go test ./...
