@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -20,6 +21,29 @@ type Telemetry struct {
 	BatteryVoltage  string `json:"battery_voltage,omitempty"`
 	WifiRSSI        string `json:"wifi_rssi,omitempty"`
 	Model           string `json:"model,omitempty"`
+}
+
+// BatteryPercent estimates the remaining charge from the reported
+// voltage using the formula published in TRMNL's battery FAQ:
+// pct = (voltage - 3) / 0.012, clamped to [0, 100]. That maps 3.0 V to
+// 0% and 4.2 V to 100%. Returns -1 if the voltage is missing or
+// unparseable. Model X devices have a dedicated gas-gauge IC that
+// reports a more precise charge level than this estimate.
+//
+// Reference: https://help.trmnl.com/en/articles/10556850-device-battery-faq
+func (t Telemetry) BatteryPercent() int {
+	v, err := strconv.ParseFloat(strings.TrimSpace(t.BatteryVoltage), 64)
+	if err != nil || v <= 0 {
+		return -1
+	}
+	pct := (v - 3.0) / 0.012
+	switch {
+	case pct < 0:
+		return 0
+	case pct > 100:
+		return 100
+	}
+	return int(pct + 0.5)
 }
 
 type Device struct {
