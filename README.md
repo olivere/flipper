@@ -283,10 +283,6 @@ When a TRMNL device migrates from another server (e.g. the TRMNL cloud), it may 
 
 ## FAQ
 
-### After updating a device to firmware 1.8.2, it polls every ~10 seconds
-
-Observed and **not yet root-caused.** On firmware ≤ 1.7.4 the device honoured the `refresh_rate` from `/api/display` responses (typically polling every 60–120 s on Flipper's default playlists). After upgrading to 1.8.2, polling collapses to a steady ~10 s cadence regardless of what `refresh_rate` Flipper emits. The wire format isn't the cause — emitting it as either a string or a number gives the same result. Possible causes still under investigation: a new required field in 1.8.2 (e.g. `image_url_timeout`, `maximum_compatibility`, `temperature_profile`, `special_function`) that we omit and that triggers a "not properly set up, retry quickly" code path on the device. If you hit this, please open an issue with a packet capture of the response so we can diff against what TRMNL's official cloud sends. Until then it costs battery but otherwise works.
-
 ### Images show ghosting or overlay of previous images
 
 This is an e-ink partial refresh artifact, not a server issue. E-ink displays have two refresh modes: full refresh (flashes black/white to fully clear the screen) and partial refresh (only updates changed pixels, which leaves remnants of the previous image). The TRMNL firmware controls which mode is used — there is no server-side field to force a full refresh.
