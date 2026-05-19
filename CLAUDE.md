@@ -10,6 +10,7 @@ internal/
   config/           TOML config + env var loading
   device/           Device registry (MAC auth, devices.json)
   display/          Image pipeline (resize, grayscale, dither, encode)
+  firmware/         Upstream firmware release metadata (read-only, cached)
   handler/          HTTP handlers (setup, display, images, log)
   layout/           Layout system for programmatic screen rendering (fogleman/gg)
   screen/           Screen interface, playlist, implementations (static, demo, weather, hackernews, news, fcbayern)
@@ -28,8 +29,11 @@ make setup          # go mod tidy
 ./bin/flipper serve --config ./config.toml  # custom config path
 ./bin/flipper devices          # list registered devices + telemetry
 ./bin/flipper devices --json   # machine-readable device list
+./bin/flipper devices --check-updates       # add LATEST column from upstream
 ./bin/flipper devices rename <mac> <name>   # set friendly name
 ./bin/flipper devices remove <mac>          # remove a device
+./bin/flipper firmware list    # recent releases from usetrmnl/trmnl-firmware
+./bin/flipper firmware status  # per-device: reported vs latest version
 ./bin/flipper config edit      # open config in $EDITOR
 ```
 

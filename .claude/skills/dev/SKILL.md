@@ -102,11 +102,24 @@ make test      # go test ./...
 ```
 flipper devices                          # list devices + telemetry (table)
 flipper devices --json                   # list devices (JSON, api_key redacted)
+flipper devices --check-updates          # add LATEST column from upstream firmware
 flipper devices rename <mac> <name>      # set friendly name
 flipper devices remove <mac>             # remove from registry
 ```
 
 Telemetry (firmware version, battery voltage, WiFi RSSI, model) is captured from device headers on each `/api/display` request and stored in `devices.json`. The `BATTERY` column in the table view shows the voltage plus an estimated percentage (e.g. `4.07V (89%)`) derived using TRMNL's published formula `(voltage - 3) / 0.012`, clamped to 0–100.
+
+### Firmware CLI (read-only)
+
+```
+flipper firmware list                    # recent releases from usetrmnl/trmnl-firmware
+flipper firmware list --all              # full list (default is last 10)
+flipper firmware list --json             # JSON output
+flipper firmware status                  # per-device current/outdated/ahead/unknown
+flipper firmware status --json
+```
+
+Pure read — no binaries downloaded, no `/api/display` response changes. Release data is cached in-process for 15 minutes to stay under GitHub's 60 req/hr unauthenticated limit. On fetch failures, `status` and `devices --check-updates` warn to stderr and show `—` rather than erroring.
 
 ### Config CLI
 

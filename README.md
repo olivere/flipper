@@ -163,9 +163,26 @@ AA:BB:CC:DD:EE:FF  —            1.7.4     4.07V (89%)  -65   og     2m ago
 
 # Remove a device from the registry
 ./bin/flipper devices remove AA:BB:CC:DD:EE:FF
+
+# Add a LATEST column showing the newest firmware released upstream
+./bin/flipper devices --check-updates
 ```
 
 Device telemetry (firmware version, battery voltage, WiFi RSSI, model) is captured automatically from headers sent by the device on each display request. The battery percentage shown next to the voltage is derived using the formula published in TRMNL's [battery FAQ](https://help.trmnl.com/en/articles/10556850-device-battery-faq) (`pct = (voltage - 3) / 0.012`, clamped to 0–100).
+
+### Firmware
+
+Flipper can surface release metadata from the upstream firmware repository — [usetrmnl/trmnl-firmware](https://github.com/usetrmnl/trmnl-firmware) — so you can tell at a glance whether your devices are running the latest version. These commands are **strictly read-only**: no binaries are downloaded, no `/api/display` fields are added, and nothing about your devices changes. Devices update themselves over-the-air from the official cloud's S3 bucket; Flipper only reports what's available.
+
+```bash
+# Show the 10 most recent releases (use --all for the full list, --json for machine output)
+./bin/flipper firmware list
+
+# Compare every registered device against the latest non-prerelease
+./bin/flipper firmware status
+```
+
+The `status` command emits one row per device with a `STATUS` column of `current`, `outdated`, `ahead`, or `unknown`. A device shows up as `unknown` if it hasn't polled yet (no telemetry) or if either side fails semver parsing. If GitHub can't be reached (typically a 60 req/hr rate limit when called repeatedly), Flipper prints a warning to stderr and falls back to `—` for the LATEST column rather than failing the whole command. Release lookups are cached in-process for 15 minutes.
 
 ### Reverse proxy (advanced)
 
