@@ -209,7 +209,7 @@ func newFirmwareCmd(configPath *string) *cobra.Command {
 			fmt.Fprintln(w, "VERSION\tPUBLISHED\tPRERELEASE\tNAME\tURL")
 			for _, r := range releases {
 				fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n",
-					r.Tag,
+					r.Version,
 					formatDate(r.PublishedAt),
 					yesNo(r.Prerelease),
 					valOrDash(r.Name),
@@ -241,12 +241,19 @@ func newFirmwareCmd(configPath *string) *cobra.Command {
 			latestVer := fetchLatestVersion(cmd)
 
 			if statusJSON {
+				// Latest is intentionally not omitempty: machine
+				// consumers need to see "latest": "" when the upstream
+				// fetch failed, so they can distinguish that from a
+				// device whose telemetry simply hasn't arrived yet
+				// (the Status field still encodes "unknown" either
+				// way, but a present-but-empty Latest is the explicit
+				// signal that the fetch fell through).
 				type row struct {
 					MAC      string `json:"mac"`
 					Name     string `json:"name,omitempty"`
 					Model    string `json:"model,omitempty"`
 					Firmware string `json:"firmware,omitempty"`
-					Latest   string `json:"latest,omitempty"`
+					Latest   string `json:"latest"`
 					Status   string `json:"status"`
 				}
 				out := make([]row, 0, len(devs))

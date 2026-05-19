@@ -31,20 +31,26 @@ const (
 	StatusUnknown  = "unknown"
 )
 
-// DefaultURL is the GitHub Releases endpoint used by ListReleases.
-// Exposed as a variable so tests can point ListReleases at a stub.
-var DefaultURL = "https://api.github.com/repos/usetrmnl/trmnl-firmware/releases?per_page=30"
+// DefaultURL is the first-page GitHub Releases endpoint used by
+// ListReleases. Exposed as a variable so tests can point ListReleases
+// at a stub. Subsequent pages are followed via the Link header.
+var DefaultURL = "https://api.github.com/repos/usetrmnl/trmnl-firmware/releases?per_page=100"
 
-const cacheTTL = 15 * time.Minute
+const (
+	cacheTTL = 15 * time.Minute
+	// maxPages caps how many pages ListReleases will follow. 100 per
+	// page × 10 pages = 1000 releases — well past anything realistic
+	// for a firmware repo and a hard stop against runaway pagination.
+	maxPages = 10
+)
 
 var httpClient = &http.Client{Timeout: 15 * time.Second}
 
 var (
-	cacheMu     sync.Mutex
-	cachedAt    time.Time
-	cachedURL   string
-	cachedRels  []Release
-	cachedError error
+	cacheMu    sync.Mutex
+	cachedAt   time.Time // zero means: nothing cached yet
+	cachedURL  string
+	cachedRels []Release
 )
 
 // resetCache clears the in-process release cache. Test helper.
@@ -54,38 +60,60 @@ func resetCache() {
 	cachedAt = time.Time{}
 	cachedURL = ""
 	cachedRels = nil
-	cachedError = nil
 }
 
-// ListReleases fetches recent firmware releases from
-// github.com/usetrmnl/trmnl-firmware. Results are cached in-process for
-// 15 minutes to stay well under the 60 req/hr unauthenticated rate
-// limit. Draft releases are filtered out; prereleases are kept (callers
-// can decide what to do with them).
+// ListReleases fetches firmware releases from
+// github.com/usetrmnl/trmnl-firmware, following pagination links until
+// the upstream stops advertising a "next" page. Results are cached
+// in-process for 15 minutes (keyed on DefaultURL) to stay well under
+// the 60 req/hr unauthenticated rate limit. Draft releases are
+// filtered out; prereleases are kept (callers can decide what to do
+// with them).
 func ListReleases(ctx context.Context) ([]Release, error) {
 	cacheMu.Lock()
-	if cachedURL == DefaultURL && time.Since(cachedAt) < cacheTTL && cachedRels != nil {
+	if cachedURL == DefaultURL && !cachedAt.IsZero() && time.Since(cachedAt) < cacheTTL {
 		out := cachedRels
 		cacheMu.Unlock()
 		return out, nil
 	}
 	cacheMu.Unlock()
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, DefaultURL, nil)
+	var releases []Release
+	url := DefaultURL
+	for page := 0; page < maxPages && url != ""; page++ {
+		batch, next, err := fetchReleasePage(ctx, url)
+		if err != nil {
+			return nil, err
+		}
+		releases = append(releases, batch...)
+		url = next
+	}
+
+	cacheMu.Lock()
+	cachedAt = time.Now()
+	cachedURL = DefaultURL
+	cachedRels = releases
+	cacheMu.Unlock()
+
+	return releases, nil
+}
+
+func fetchReleasePage(ctx context.Context, url string) ([]Release, string, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
-		return nil, fmt.Errorf("build request: %w", err)
+		return nil, "", fmt.Errorf("build request: %w", err)
 	}
 	req.Header.Set("Accept", "application/vnd.github+json")
 	req.Header.Set("X-GitHub-Api-Version", "2022-11-28")
 
 	resp, err := httpClient.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("fetch releases: %w", err)
+		return nil, "", fmt.Errorf("fetch releases: %w", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("github returned status %d", resp.StatusCode)
+		return nil, "", fmt.Errorf("github returned status %d", resp.StatusCode)
 	}
 
 	var raw []struct {
@@ -98,7 +126,7 @@ func ListReleases(ctx context.Context) ([]Release, error) {
 		Draft       bool      `json:"draft"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&raw); err != nil {
-		return nil, fmt.Errorf("decode releases: %w", err)
+		return nil, "", fmt.Errorf("decode releases: %w", err)
 	}
 
 	releases := make([]Release, 0, len(raw))
@@ -116,14 +144,33 @@ func ListReleases(ctx context.Context) ([]Release, error) {
 			Prerelease:  r.Prerelease,
 		})
 	}
+	return releases, nextPageURL(resp.Header.Get("Link")), nil
+}
 
-	cacheMu.Lock()
-	cachedAt = time.Now()
-	cachedURL = DefaultURL
-	cachedRels = releases
-	cacheMu.Unlock()
-
-	return releases, nil
+// nextPageURL extracts the rel="next" target from a GitHub-style Link
+// header. Returns "" if no next page is advertised.
+//
+// Example header:
+//
+//	<https://api.github.com/.../releases?per_page=100&page=2>; rel="next",
+//	<https://api.github.com/.../releases?per_page=100&page=3>; rel="last"
+func nextPageURL(linkHeader string) string {
+	for part := range strings.SplitSeq(linkHeader, ",") {
+		segs := strings.Split(strings.TrimSpace(part), ";")
+		if len(segs) < 2 {
+			continue
+		}
+		target := strings.TrimSpace(segs[0])
+		if !strings.HasPrefix(target, "<") || !strings.HasSuffix(target, ">") {
+			continue
+		}
+		for _, attr := range segs[1:] {
+			if strings.TrimSpace(attr) == `rel="next"` {
+				return target[1 : len(target)-1]
+			}
+		}
+	}
+	return ""
 }
 
 // Latest returns the highest non-prerelease semver release, or a zero

@@ -163,6 +163,65 @@ func TestListReleasesCaches(t *testing.T) {
 	}
 }
 
+func TestListReleasesFollowsPagination(t *testing.T) {
+	resetCache()
+	t.Cleanup(resetCache)
+
+	page1 := []byte(`[
+		{"tag_name":"v2.0.0","name":"v2.0.0","html_url":"https://x/2.0.0","published_at":"2026-06-01T00:00:00Z","prerelease":false,"draft":false},
+		{"tag_name":"v1.9.0","name":"v1.9.0","html_url":"https://x/1.9.0","published_at":"2026-05-01T00:00:00Z","prerelease":false,"draft":false}
+	]`)
+	page2 := []byte(`[
+		{"tag_name":"v1.8.2","name":"v1.8.2","html_url":"https://x/1.8.2","published_at":"2026-05-04T00:00:00Z","prerelease":false,"draft":false}
+	]`)
+
+	var srv *httptest.Server
+	srv = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Query().Get("page") {
+		case "", "1":
+			w.Header().Set("Link", `<`+srv.URL+`/r?page=2>; rel="next", <`+srv.URL+`/r?page=2>; rel="last"`)
+			_, _ = w.Write(page1)
+		case "2":
+			_, _ = w.Write(page2)
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	t.Cleanup(srv.Close)
+
+	origURL := DefaultURL
+	DefaultURL = srv.URL + "/r?page=1"
+	t.Cleanup(func() { DefaultURL = origURL })
+
+	releases, err := ListReleases(context.Background())
+	if err != nil {
+		t.Fatalf("ListReleases: %v", err)
+	}
+	if len(releases) != 3 {
+		t.Fatalf("got %d releases across both pages, want 3", len(releases))
+	}
+	if releases[2].Version != "1.8.2" {
+		t.Errorf("releases[2].Version = %q, want 1.8.2", releases[2].Version)
+	}
+}
+
+func TestNextPageURL(t *testing.T) {
+	tests := []struct {
+		in, want string
+	}{
+		{"", ""},
+		{`<https://example/p2>; rel="next", <https://example/p9>; rel="last"`, "https://example/p2"},
+		{`<https://example/p9>; rel="last"`, ""},
+		{`<https://example/p2>; rel="next"`, "https://example/p2"},
+		{`<https://example/p1>; rel="prev", <https://example/p3>; rel="next"`, "https://example/p3"},
+	}
+	for _, tt := range tests {
+		if got := nextPageURL(tt.in); got != tt.want {
+			t.Errorf("nextPageURL(%q) = %q, want %q", tt.in, got, tt.want)
+		}
+	}
+}
+
 func TestListReleasesServerError(t *testing.T) {
 	resetCache()
 	t.Cleanup(resetCache)
