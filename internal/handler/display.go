@@ -11,13 +11,20 @@ import (
 	"github.com/olivere/flipper/internal/screen"
 )
 
+// RefreshRate must be encoded as a JSON number (not a string).
+// TRMNL firmware ≥ 1.8.2 parses `refresh_rate` as uint64 via
+// ArduinoJson without an implicit string-to-int fallback; a JSON
+// string yields 0 and the device falls back to its minimum poll
+// interval (~10s), draining the battery. Earlier firmware (≤ 1.7.4)
+// tolerated either form. See lib/trmnl/src/parse_response_api_display.cpp
+// in usetrmnl/trmnl-firmware and the corresponding test fixture.
 type displayResponse struct {
 	Status         int     `json:"status"`
 	ImageURL       string  `json:"image_url"`
 	Filename       string  `json:"filename"`
 	UpdateFirmware bool    `json:"update_firmware"`
 	FirmwareURL    *string `json:"firmware_url"`
-	RefreshRate    string  `json:"refresh_rate"`
+	RefreshRate    int     `json:"refresh_rate"`
 	ResetFirmware  bool    `json:"reset_firmware"`
 }
 
@@ -164,7 +171,7 @@ func writeFirmwareResponse(w http.ResponseWriter, refreshRate int, firmwareURL s
 		Status:         0,
 		UpdateFirmware: true,
 		FirmwareURL:    &firmwareURL,
-		RefreshRate:    strconv.Itoa(refreshRate),
+		RefreshRate:    refreshRate,
 	}
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(resp)
@@ -181,7 +188,7 @@ func writeDisplayResponse(w http.ResponseWriter, r *http.Request, result *displa
 		Status:      0,
 		ImageURL:    fmt.Sprintf("%s://%s/images/%s", scheme, host, result.Filename),
 		Filename:    result.Filename,
-		RefreshRate: strconv.Itoa(refreshRate),
+		RefreshRate: refreshRate,
 	}
 
 	w.Header().Set("Content-Type", "application/json")

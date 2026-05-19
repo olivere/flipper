@@ -121,7 +121,7 @@ flipper firmware status                  # per-device current/outdated/ahead/unk
 flipper firmware status --json
 ```
 
-Apply side (gated by `[firmware] enabled = true`, default true). The .bin must be supplied by the operator — TRMNL upstream releases on GitHub carry no asset attachments:
+Apply side (gated by `[firmware] enabled = true`, default true). The .bin must be supplied by the operator:
 
 ```
 flipper firmware import <path|url> --version <v> --model <m>   # add a .bin to the local store
@@ -133,6 +133,12 @@ flipper firmware armed                                         # list devices wi
 ```
 
 The flash runs on the next `/api/display` poll: Flipper returns a response with `update_firmware=true` and `firmware_url` pointing at `/firmware/{filename}`. The arm is consumed by that single dispatch — a failed flash never auto-retries (the operator must re-arm), and a model mismatch between the arm and the device's `Model` header drops the arm with a logged error. Binaries live in `$XDG_DATA_HOME/flipper/firmware/`; pending arms in `$XDG_DATA_HOME/flipper/firmware-pending.json` (file-locked so concurrent CLI/server processes don't lose arms).
+
+Three non-obvious things, learned the hard way on a real device:
+
+- **The `/firmware/{filename}` route is unauthenticated by design.** TRMNL firmware (verified on OG 1.7.4 / 1.8.2) does not send `ID` / `Access-Token` headers when fetching the firmware URL. Auth-gating this route blocks every real OTA with a 401. The security boundary is `/api/display`.
+- **`trmnl.com/firmware/{model}/{version}.bin` is a *combined* image (bootloader + partition table + app) — not an OTA-ready image.** That bin works for `esptool write_flash 0x0` (USB recovery) but `Update.begin()` rejects it silently. For OTA you need the app-only image — extract the first 64 KiB out with `dd if=combined.bin of=app.bin bs=4096 skip=16`, or build from source. See README's "Sourcing the binary" subsection.
+- **`refresh_rate` in the `/api/display` response is emitted as a JSON number, not a string.** Matches the firmware's parser test fixtures (`test/test_parse_api_display/` uses `refresh_rate: 123456`). `internal/handler/display.go` types it as `int` and the integration test in `internal/server/server_test.go` asserts the wire form. **Note:** there is a separate, *not-yet-root-caused* device-side issue where firmware 1.8.2 polls every ~10s regardless of the value we send (string or number). See the FAQ entry "After updating a device to firmware 1.8.2…" — likely a missing optional field in our response that triggers a "not properly set up" code path on the device.
 
 ### Config CLI
 

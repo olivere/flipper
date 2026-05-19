@@ -118,11 +118,22 @@ func TestIntegration(t *testing.T) {
 		t.Fatalf("setup: expected 200, got %d", resp.StatusCode)
 	}
 
-	var setupResp map[string]string
+	// The TRMNL firmware parses `status` as int with ArduinoJson and
+	// bails out before extracting api_key when status != 200. Make
+	// sure we decode into typed fields so the test catches any future
+	// regression to a string status.
+	var setupResp struct {
+		Status     int    `json:"status"`
+		APIKey     string `json:"api_key"`
+		FriendlyID string `json:"friendly_id"`
+	}
 	if err := json.NewDecoder(resp.Body).Decode(&setupResp); err != nil {
 		t.Fatal(err)
 	}
-	apiKey := setupResp["api_key"]
+	if setupResp.Status != 200 {
+		t.Fatalf("setup: expected status 200 (int), got %d", setupResp.Status)
+	}
+	apiKey := setupResp.APIKey
 	if apiKey == "" {
 		t.Fatal("setup: expected non-empty api_key")
 	}
@@ -156,13 +167,18 @@ func TestIntegration(t *testing.T) {
 		t.Fatal("display: expected non-empty filename")
 	}
 
-	// Verify refresh_rate is a string
-	refreshRate, ok := displayResp["refresh_rate"].(string)
+	// Verify refresh_rate is a JSON number, not a string. TRMNL
+	// firmware ≥ 1.8.2 parses this field as uint64 with no
+	// string-to-int fallback, so emitting it as a string yields 0 on
+	// the device and triggers a ~10s polling spin. encoding/json
+	// decodes JSON numbers into float64 when the target is any.
+	refreshRate, ok := displayResp["refresh_rate"].(float64)
 	if !ok {
-		t.Fatal("display: refresh_rate should be a string")
+		t.Fatalf("display: refresh_rate should be a JSON number, got %T: %v",
+			displayResp["refresh_rate"], displayResp["refresh_rate"])
 	}
-	if refreshRate != "900" {
-		t.Errorf("display: expected refresh_rate 900, got %s", refreshRate)
+	if refreshRate != 900 {
+		t.Errorf("display: expected refresh_rate 900, got %v", refreshRate)
 	}
 
 	// Step 3: Download the image
@@ -223,10 +239,14 @@ func TestSlideshowRotation(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	var setupResp map[string]string
+	var setupResp struct {
+		Status     int    `json:"status"`
+		APIKey     string `json:"api_key"`
+		FriendlyID string `json:"friendly_id"`
+	}
 	json.NewDecoder(resp.Body).Decode(&setupResp)
 	resp.Body.Close()
-	apiKey := setupResp["api_key"]
+	apiKey := setupResp.APIKey
 
 	// First display call
 	fn1 := fetchDisplayFilename(t, ts.URL, mac, apiKey)

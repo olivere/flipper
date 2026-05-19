@@ -133,7 +133,7 @@ func TestDisplayDispatchesFirmwareWhenArmed(t *testing.T) {
 		Filename       string  `json:"filename"`
 		UpdateFirmware bool    `json:"update_firmware"`
 		FirmwareURL    *string `json:"firmware_url"`
-		RefreshRate    string  `json:"refresh_rate"`
+		RefreshRate    int     `json:"refresh_rate"`
 	}
 	if err := json.Unmarshal(rr.Body.Bytes(), &resp); err != nil {
 		t.Fatalf("decode response: %v\n%s", err, rr.Body.String())
@@ -227,27 +227,24 @@ func TestDisplayFallsThroughWhenNotArmed(t *testing.T) {
 	}
 }
 
-func TestServeFirmwareRequiresAuth(t *testing.T) {
+func TestServeFirmwareDoesNotRequireAuth(t *testing.T) {
+	// TRMNL OG firmware 1.7.4 does NOT send ID / Access-Token headers
+	// when fetching firmware_url, so requiring them blocks every real
+	// OTA. The real security boundary is /api/display (which decides
+	// which binary gets dispatched to which MAC); this endpoint only
+	// serves bytes whose filenames are already in our store.
 	fx := newFirmwareFixture(t)
 	r := chi.NewRouter()
 	r.Get("/firmware/{filename}", fx.handler.ServeFirmware)
 
-	// No headers → 401.
 	req := httptest.NewRequest(http.MethodGet, "/firmware/"+fx.binary.Filename, nil)
 	rr := httptest.NewRecorder()
 	r.ServeHTTP(rr, req)
-	if rr.Code != http.StatusUnauthorized {
-		t.Errorf("missing auth: status = %d, want 401", rr.Code)
+	if rr.Code != http.StatusOK {
+		t.Errorf("no-auth fetch: status = %d, want 200", rr.Code)
 	}
-
-	// Wrong token → 401.
-	req = httptest.NewRequest(http.MethodGet, "/firmware/"+fx.binary.Filename, nil)
-	req.Header.Set("ID", fx.mac)
-	req.Header.Set("Access-Token", "nope")
-	rr = httptest.NewRecorder()
-	r.ServeHTTP(rr, req)
-	if rr.Code != http.StatusUnauthorized {
-		t.Errorf("bad token: status = %d, want 401", rr.Code)
+	if rr.Body.String() != string(fx.binBytes) {
+		t.Errorf("no-auth fetch returned wrong bytes")
 	}
 }
 

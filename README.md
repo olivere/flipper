@@ -187,13 +187,44 @@ The `status` command emits one row per device with a `STATUS` column of `current
 
 #### Applying firmware updates
 
-> **Warning:** Flashing the wrong firmware can brick a device. Flipper enforces a one-shot, model-matched dispatch model to keep failures contained — but the bytes you import are yours, and there is no community CDN you can trust by default. Verify them out-of-band.
+> **Warning:** Flashing the wrong firmware can brick a device. Flipper enforces a one-shot, model-matched dispatch model to keep failures contained — but the bytes you import are yours, and TRMNL's official OTA pipeline isn't publicly reachable. Verify the binary you import out-of-band.
 
-The TRMNL upstream releases on GitHub carry **no binary attachments** (the official cloud serves bins from a private S3 bucket). To apply an update, you bring the `.bin` file yourself — built from source, extracted from an existing cloud-managed device, or supplied by a hardware vendor — and import it into the local store. The device model that the binary targets is required at import time; trying to dispatch a binary whose model doesn't match the device's reported `Model` header is refused.
+##### Sourcing the binary
+
+TRMNL upstream releases on GitHub carry no `.bin` attachments. Their official cloud serves OTA binaries from a private S3 bucket. There are two practical sources, and they require *different* binary formats — getting this wrong is the most common cause of "the device downloaded the firmware and then nothing happened":
+
+| Use case | Binary format | Where to get it |
+|---|---|---|
+| **USB recovery** (`esptool write_flash 0x0`) | **Combined image** — bootloader + partition table + app, written from flash offset 0x0 | Public CDN: `https://trmnl.com/firmware/{model}/{version}.bin` (same one used by `trmnl.com/flash`) |
+| **OTA via Flipper** (this feature) | **App-only image** — starts at the app partition offset; ESP-IDF's `Update.begin()` rejects anything else, *silently* | Extract from the combined image, **or** build from source |
+
+The combined image you can download from `trmnl.com/firmware/...` is correct for [`docs/recovery.md`](docs/recovery.md) but **wrong for OTA**. If you arm it, the device will dutifully download the bytes, fail verification with no log entry, and keep running the old firmware. (You won't see this in Flipper either — TRMNL devices don't ack flash outcomes.)
+
+To extract the app-only image from a combined image, strip the first 64 KiB (bootloader + partition-table area; the app sits at flash offset `0x10000`):
 
 ```bash
-# 1. Import a binary you trust. Filename is generated as FW-<version>.<model>.bin.
-./bin/flipper firmware import ./FW-1.8.2.TRMNL_X.bin --version 1.8.2 --model TRMNL_X
+# Download the combined image
+curl -fLo trmnl-og-FW1.8.2.bin https://trmnl.com/firmware/trmnl/FW1.8.2.bin
+
+# Strip the first 64 KiB to get the OTA-ready app
+dd if=trmnl-og-FW1.8.2.bin of=trmnl-og-FW1.8.2-app.bin bs=4096 skip=16
+
+# Sanity check: first byte must be 0xE9 (ESP image magic), and the entry-point
+# bytes at offset 0x04-0x07 (little-endian) should land in the app IRAM range
+# — roughly 0x4038xxxx for ESP32-C3 apps (vs 0x403cxxxx for the bootloader).
+xxd trmnl-og-FW1.8.2-app.bin | head -1
+# expect: 00000000: e9.. .... f61d 3840 ...   ← entry point 0x40381df6 → app
+```
+
+Alternatively, build from source: clone [`usetrmnl/trmnl-firmware`](https://github.com/usetrmnl/trmnl-firmware), check out the version tag, install PlatformIO, run `pio run -e trmnl` (for OG; use `trmnl_x` for TRMNL X). The output at `.pio/build/<env>/firmware.bin` is the app-only image, guaranteed correct.
+
+##### Applying the update
+
+The device model passed via `--model` must match what the target device reports in its `Model` header (visible in `flipper firmware status`) — e.g. `og` for TRMNL OG, `trmnl_x` for TRMNL X. A mismatch at dispatch time drops the arm with a logged error.
+
+```bash
+# 1. Import the OTA-ready binary you just extracted (or built).
+./bin/flipper firmware import ./trmnl-og-FW1.8.2-app.bin --version 1.8.2 --model og
 
 # 2. List the local store (also accepts --json).
 ./bin/flipper firmware binaries
@@ -208,17 +239,19 @@ The TRMNL upstream releases on GitHub carry **no binary attachments** (the offic
 ./bin/flipper firmware cancel AA:BB:CC:DD:EE:FF
 
 # 6. Remove a binary from the local store.
-./bin/flipper firmware remove 1.8.2 --model TRMNL_X
+./bin/flipper firmware remove 1.8.2 --model og
 ```
 
 The flash actually runs the next time the device polls `/api/display`: Flipper serves a response with `update_firmware=true` and a `firmware_url` pointing at `/firmware/{filename}`, the device downloads and flashes, and the arm is consumed in the same step. Importantly:
 
 - **One-shot, never auto-retried.** A failed flash does not re-arm itself. The operator must explicitly arm again. This prevents the brick-loop where a device repeatedly tries to flash a bad binary on every wake.
 - **Model match enforced at dispatch.** Even if the right binary is imported, the arm's recorded model must match the `Model` header the device sends; mismatched arms are dropped with a logged error.
-- **Authenticated downloads.** `/firmware/{filename}` requires the same MAC + Access-Token pair as `/api/display`, so a network eavesdropper can't pull binaries without the device's key.
+- **`/firmware/{filename}` is intentionally unauthenticated.** TRMNL devices don't send `ID` / `Access-Token` headers when fetching the firmware URL, so gating this endpoint by auth would block every real OTA. The security boundary is `/api/display` — it decides which binary gets dispatched to which device. The bytes themselves are not secret (they're the same builds published at `trmnl.com/firmware/`); only filenames already in the local store are served, and every request is logged with its source address.
 - **No success/failure callback.** TRMNL devices do not report flash outcomes. The signal a flash worked is that the next `/api/display` poll's `FW-Version` header reflects the new version — visible in `flipper firmware status`.
 
 Binaries and their manifest live under `$XDG_DATA_HOME/flipper/firmware/`; the pending-arm state lives in `$XDG_DATA_HOME/flipper/firmware-pending.json` (with a file lock so concurrent CLI and server processes don't lose arms via a lost-update race).
+
+If a flash leaves a device in a broken state, the recovery path is a USB reflash with `esptool.py`. See [`docs/recovery.md`](docs/recovery.md) for the full procedure on macOS, Linux, and Windows — read it once *before* you arm your first OTA, so the rollback binary is on disk when you need it.
 
 To disable the apply side entirely (the read-only `list`/`status` commands keep working), set `[firmware] enabled = false` in config. With that, the `/firmware/{filename}` route is not registered, `/api/display` skips the pending-arm check, and the apply commands refuse to run.
 
@@ -234,13 +267,25 @@ If you prefer to terminate TLS externally (e.g. with Caddy or nginx), disable Fl
 | `/api/display` | GET | `ID: <MAC>`, `Access-Token: <key>` | Get next display image URL |
 | `/api/log` | POST | `ID: <MAC>` (optional) | Accept device log messages |
 | `/images/{filename}` | GET | — | Serve processed images |
-| `/firmware/{filename}` | GET | `ID: <MAC>`, `Access-Token: <key>` | Serve an imported firmware binary (only when `[firmware] enabled = true`) |
+| `/firmware/{filename}` | GET | — | Serve an imported firmware binary (only when `[firmware] enabled = true`; unauthenticated — see "Applying firmware updates" for why) |
 
 ### Token adoption
 
 When a TRMNL device migrates from another server (e.g. the TRMNL cloud), it may send an API key that doesn't match the one Flipper derived during setup. While `setup_mode` is enabled, Flipper automatically adopts the device's token on first contact, so devices work without manual key reconfiguration. Disable `setup_mode` after onboarding to lock down token adoption.
 
+### `/api/display` response shape
+
+`refresh_rate` is emitted as a **JSON number** to match the firmware's parser test fixtures (`refresh_rate: 123456` in `test/test_parse_api_display/`). Most TRMNL firmware versions appear to tolerate either form, but matching the test-fixture shape is the conservative choice. If you fork Flipper or build your own server, mirror this:
+
+```json
+{"status":0,"image_url":"...","refresh_rate":900,"update_firmware":false,"firmware_url":null,"reset_firmware":false}
+```
+
 ## FAQ
+
+### After updating a device to firmware 1.8.2, it polls every ~10 seconds
+
+Observed and **not yet root-caused.** On firmware ≤ 1.7.4 the device honoured the `refresh_rate` from `/api/display` responses (typically polling every 60–120 s on Flipper's default playlists). After upgrading to 1.8.2, polling collapses to a steady ~10 s cadence regardless of what `refresh_rate` Flipper emits. The wire format isn't the cause — emitting it as either a string or a number gives the same result. Possible causes still under investigation: a new required field in 1.8.2 (e.g. `image_url_timeout`, `maximum_compatibility`, `temperature_profile`, `special_function`) that we omit and that triggers a "not properly set up, retry quickly" code path on the device. If you hit this, please open an issue with a packet capture of the response so we can diff against what TRMNL's official cloud sends. Until then it costs battery but otherwise works.
 
 ### Images show ghosting or overlay of previous images
 
