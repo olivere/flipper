@@ -7,6 +7,7 @@ import (
 	"github.com/olivere/flipper/internal/config"
 	"github.com/olivere/flipper/internal/device"
 	"github.com/olivere/flipper/internal/display"
+	"github.com/olivere/flipper/internal/firmware"
 	"github.com/olivere/flipper/internal/screen"
 )
 
@@ -18,7 +19,17 @@ type Handler struct {
 	Playlist *screen.Playlist
 	Pipeline *display.Pipeline
 	Cache    *ImageCache
+	Firmware *Firmware // nil when firmware support is disabled
 	Logger   *slog.Logger
+}
+
+// Firmware bundles the local binary store and pending-arm tracker.
+// Both are nil-safe to leave unset when firmware support is off; the
+// Handler keeps them as a pair because the firmware-dispatch path
+// only makes sense when both are present.
+type Firmware struct {
+	Store   *firmware.Store
+	Pending *firmware.Pending
 }
 
 // ImageCache stores processed images by filename so the image endpoint
