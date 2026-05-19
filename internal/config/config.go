@@ -18,7 +18,17 @@ type Config struct {
 	Server   ServerConfig    `toml:"server"`
 	Device   DeviceConfig    `toml:"device"`
 	Screens  ScreensConfig   `toml:"screens"`
+	Firmware FirmwareConfig  `toml:"firmware"`
 	Playlist []PlaylistEntry `toml:"playlist"`
+}
+
+// FirmwareConfig gates the firmware OTA feature. When Enabled is
+// false, the /firmware/{filename} route is not registered, the
+// /api/display handler skips the pending-arm check, and the
+// apply-side CLI commands refuse to run. The read-only `firmware
+// list` and `firmware status` commands keep working regardless.
+type FirmwareConfig struct {
+	Enabled bool `toml:"enabled"`
 }
 
 type ServerConfig struct {
@@ -82,6 +92,7 @@ func defaults() Config {
 				Dir: "~/Pictures/trmnl",
 			},
 		},
+		Firmware: FirmwareConfig{Enabled: true},
 	}
 }
 
@@ -164,6 +175,11 @@ func applyEnv(cfg *Config) {
 	}
 	if v := os.Getenv("FLIPPER_TLS_KEY_FILE"); v != "" {
 		cfg.Server.TLS.KeyFile = v
+	}
+	if v := os.Getenv("FLIPPER_FIRMWARE_ENABLED"); v != "" {
+		if b, err := strconv.ParseBool(v); err == nil {
+			cfg.Firmware.Enabled = b
+		}
 	}
 }
 

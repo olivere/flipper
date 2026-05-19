@@ -76,6 +76,7 @@ Flipper reads TOML config from `~/.config/flipper/config.toml` (or pass `--confi
 | Rotate screens | `screens.rotate` | `FLIPPER_SCREENS_ROTATE` | `false` |
 | Image directory | `screens.static.dir` | `FLIPPER_STATIC_DIR` | `~/Pictures/trmnl` |
 | Demo screen | `screens.demo.enabled` | — | `false` |
+| Firmware OTA | `firmware.enabled` | `FLIPPER_FIRMWARE_ENABLED` | `true` |
 
 ### Playlist
 
@@ -172,7 +173,7 @@ Device telemetry (firmware version, battery voltage, WiFi RSSI, model) is captur
 
 ### Firmware
 
-Flipper can surface release metadata from the upstream firmware repository — [usetrmnl/trmnl-firmware](https://github.com/usetrmnl/trmnl-firmware) — so you can tell at a glance whether your devices are running the latest version. These commands are **strictly read-only**: no binaries are downloaded, no `/api/display` fields are added, and nothing about your devices changes. Devices update themselves over-the-air from the official cloud's S3 bucket; Flipper only reports what's available.
+Flipper can surface release metadata from the upstream firmware repository — [usetrmnl/trmnl-firmware](https://github.com/usetrmnl/trmnl-firmware) — and, if you bring your own .bin file, dispatch it to a specific device as a one-shot OTA. The metadata commands are strictly read-only; the apply commands actively flash devices and are described below.
 
 ```bash
 # Show the 10 most recent releases (use --all for the full list, --json for machine output)
@@ -182,7 +183,44 @@ Flipper can surface release metadata from the upstream firmware repository — [
 ./bin/flipper firmware status
 ```
 
-The `status` command emits one row per device with a `STATUS` column of `current`, `outdated`, `ahead`, or `unknown`. A device shows up as `unknown` if it hasn't polled yet (no telemetry) or if either side fails semver parsing. If GitHub can't be reached (typically a 60 req/hr rate limit when called repeatedly), Flipper prints a warning to stderr and falls back to `—` for the LATEST column rather than failing the whole command. Release lookups are cached in-process for 15 minutes.
+The `status` command emits one row per device with a `STATUS` column of `current`, `outdated`, `ahead`, or `unknown`. A device shows up as `unknown` if it hasn't polled yet (no telemetry) or if either side fails semver parsing. If GitHub can't be reached (typically a 60 req/hr rate limit when called repeatedly), Flipper prints a warning to stderr and falls back to `—` for the LATEST column rather than failing the whole command. Release lookups are cached in-process for 15 minutes. When any device has a pending update, an extra `ARMED` column appears showing the queued version.
+
+#### Applying firmware updates
+
+> **Warning:** Flashing the wrong firmware can brick a device. Flipper enforces a one-shot, model-matched dispatch model to keep failures contained — but the bytes you import are yours, and there is no community CDN you can trust by default. Verify them out-of-band.
+
+The TRMNL upstream releases on GitHub carry **no binary attachments** (the official cloud serves bins from a private S3 bucket). To apply an update, you bring the `.bin` file yourself — built from source, extracted from an existing cloud-managed device, or supplied by a hardware vendor — and import it into the local store. The device model that the binary targets is required at import time; trying to dispatch a binary whose model doesn't match the device's reported `Model` header is refused.
+
+```bash
+# 1. Import a binary you trust. Filename is generated as FW-<version>.<model>.bin.
+./bin/flipper firmware import ./FW-1.8.2.TRMNL_X.bin --version 1.8.2 --model TRMNL_X
+
+# 2. List the local store (also accepts --json).
+./bin/flipper firmware binaries
+
+# 3. Arm a one-shot OTA for one device. Prompts for confirmation; use --yes to skip.
+./bin/flipper firmware update AA:BB:CC:DD:EE:FF 1.8.2
+
+# 4. Inspect what's armed across the fleet.
+./bin/flipper firmware armed
+
+# 5. Disarm if you change your mind before the device polls.
+./bin/flipper firmware cancel AA:BB:CC:DD:EE:FF
+
+# 6. Remove a binary from the local store.
+./bin/flipper firmware remove 1.8.2 --model TRMNL_X
+```
+
+The flash actually runs the next time the device polls `/api/display`: Flipper serves a response with `update_firmware=true` and a `firmware_url` pointing at `/firmware/{filename}`, the device downloads and flashes, and the arm is consumed in the same step. Importantly:
+
+- **One-shot, never auto-retried.** A failed flash does not re-arm itself. The operator must explicitly arm again. This prevents the brick-loop where a device repeatedly tries to flash a bad binary on every wake.
+- **Model match enforced at dispatch.** Even if the right binary is imported, the arm's recorded model must match the `Model` header the device sends; mismatched arms are dropped with a logged error.
+- **Authenticated downloads.** `/firmware/{filename}` requires the same MAC + Access-Token pair as `/api/display`, so a network eavesdropper can't pull binaries without the device's key.
+- **No success/failure callback.** TRMNL devices do not report flash outcomes. The signal a flash worked is that the next `/api/display` poll's `FW-Version` header reflects the new version — visible in `flipper firmware status`.
+
+Binaries and their manifest live under `$XDG_DATA_HOME/flipper/firmware/`; the pending-arm state lives in `$XDG_DATA_HOME/flipper/firmware-pending.json` (with a file lock so concurrent CLI and server processes don't lose arms via a lost-update race).
+
+To disable the apply side entirely (the read-only `list`/`status` commands keep working), set `[firmware] enabled = false` in config. With that, the `/firmware/{filename}` route is not registered, `/api/display` skips the pending-arm check, and the apply commands refuse to run.
 
 ### Reverse proxy (advanced)
 
@@ -196,6 +234,7 @@ If you prefer to terminate TLS externally (e.g. with Caddy or nginx), disable Fl
 | `/api/display` | GET | `ID: <MAC>`, `Access-Token: <key>` | Get next display image URL |
 | `/api/log` | POST | `ID: <MAC>` (optional) | Accept device log messages |
 | `/images/{filename}` | GET | — | Serve processed images |
+| `/firmware/{filename}` | GET | `ID: <MAC>`, `Access-Token: <key>` | Serve an imported firmware binary (only when `[firmware] enabled = true`) |
 
 ### Token adoption
 

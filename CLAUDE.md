@@ -10,8 +10,8 @@ internal/
   config/           TOML config + env var loading
   device/           Device registry (MAC auth, devices.json)
   display/          Image pipeline (resize, grayscale, dither, encode)
-  firmware/         Upstream firmware release metadata (read-only, cached)
-  handler/          HTTP handlers (setup, display, images, log)
+  firmware/         Upstream release metadata + local binary store + one-shot OTA arm tracker
+  handler/          HTTP handlers (setup, display, images, log, firmware)
   layout/           Layout system for programmatic screen rendering (fogleman/gg)
   screen/           Screen interface, playlist, implementations (static, demo, weather, hackernews, news, fcbayern)
   selfcert/         Self-signed TLS certificate generation
@@ -32,9 +32,15 @@ make setup          # go mod tidy
 ./bin/flipper devices --check-updates       # add LATEST column from upstream
 ./bin/flipper devices rename <mac> <name>   # set friendly name
 ./bin/flipper devices remove <mac>          # remove a device
-./bin/flipper firmware list    # recent releases from usetrmnl/trmnl-firmware
-./bin/flipper firmware status  # per-device: reported vs latest version
-./bin/flipper config edit      # open config in $EDITOR
+./bin/flipper firmware list                                            # recent releases from usetrmnl/trmnl-firmware
+./bin/flipper firmware status                                          # per-device: reported vs latest (+ ARMED column)
+./bin/flipper firmware import <path|url> --version <v> --model <m>     # add a .bin to the local store
+./bin/flipper firmware binaries                                        # list imported binaries
+./bin/flipper firmware remove <version> --model <m>                    # delete a binary
+./bin/flipper firmware update <mac> <version>                          # arm a one-shot OTA (--yes / --force available)
+./bin/flipper firmware cancel <mac>                                    # disarm a pending update
+./bin/flipper firmware armed                                           # list devices with a pending arm
+./bin/flipper config edit                                              # open config in $EDITOR
 ```
 
 ## TLS

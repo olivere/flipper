@@ -207,6 +207,22 @@ func (r *Registry) SetName(mac, name string) bool {
 	return true
 }
 
+// Get returns a copy of the device record for mac with the API key
+// redacted, plus an ok flag. Used by callers that need just one
+// device's telemetry without scanning the full List.
+func (r *Registry) Get(mac string) (*Device, bool) {
+	mac = normMAC(mac)
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	d, ok := r.devices[mac]
+	if !ok {
+		return nil, false
+	}
+	copy := *d
+	copy.APIKey = "***"
+	return &copy, true
+}
+
 // List returns all registered devices with API keys redacted.
 func (r *Registry) List() []*Device {
 	r.mu.RLock()

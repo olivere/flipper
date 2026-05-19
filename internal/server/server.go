@@ -19,6 +19,7 @@ import (
 	"github.com/olivere/flipper/internal/config"
 	"github.com/olivere/flipper/internal/device"
 	"github.com/olivere/flipper/internal/display"
+	"github.com/olivere/flipper/internal/firmware"
 	"github.com/olivere/flipper/internal/handler"
 	"github.com/olivere/flipper/internal/screen"
 	"github.com/olivere/flipper/internal/selfcert"
@@ -98,6 +99,20 @@ func Run(ctx context.Context, cfg *config.Config) error {
 		logger.Info("playlist enabled", "entries", playlist.Len())
 	}
 
+	var fw *handler.Firmware
+	if cfg.Firmware.Enabled {
+		store, err := firmware.NewStore()
+		if err != nil {
+			return fmt.Errorf("init firmware store: %w", err)
+		}
+		pending, err := firmware.NewPending()
+		if err != nil {
+			return fmt.Errorf("init firmware pending: %w", err)
+		}
+		fw = &handler.Firmware{Store: store, Pending: pending}
+		logger.Info("firmware support enabled", "dir", store.Dir())
+	}
+
 	h := &handler.Handler{
 		Config:   cfg,
 		Devices:  registry,
@@ -105,6 +120,7 @@ func Run(ctx context.Context, cfg *config.Config) error {
 		Playlist: playlist,
 		Pipeline: pipeline,
 		Cache:    cache,
+		Firmware: fw,
 		Logger:   logger,
 	}
 
@@ -117,6 +133,9 @@ func Run(ctx context.Context, cfg *config.Config) error {
 	r.Get("/api/display", h.Display)
 	r.Post("/api/log", h.Log)
 	r.Get("/images/{filename}", h.ServeImage)
+	if fw != nil {
+		r.Get("/firmware/{filename}", h.ServeFirmware)
+	}
 
 	srv := &http.Server{
 		Addr:    cfg.Server.Addr,

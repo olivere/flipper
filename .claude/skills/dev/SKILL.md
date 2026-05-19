@@ -109,17 +109,30 @@ flipper devices remove <mac>             # remove from registry
 
 Telemetry (firmware version, battery voltage, WiFi RSSI, model) is captured from device headers on each `/api/display` request and stored in `devices.json`. The `BATTERY` column in the table view shows the voltage plus an estimated percentage (e.g. `4.07V (89%)`) derived using TRMNL's published formula `(voltage - 3) / 0.012`, clamped to 0–100.
 
-### Firmware CLI (read-only)
+### Firmware CLI
+
+Read-only release metadata (caches GitHub for 15 min; warns + falls back to `—` on fetch failure):
 
 ```
 flipper firmware list                    # recent releases from usetrmnl/trmnl-firmware
 flipper firmware list --all              # full list (default is last 10)
 flipper firmware list --json             # JSON output
-flipper firmware status                  # per-device current/outdated/ahead/unknown
+flipper firmware status                  # per-device current/outdated/ahead/unknown (+ ARMED column when set)
 flipper firmware status --json
 ```
 
-Pure read — no binaries downloaded, no `/api/display` response changes. Release data is cached in-process for 15 minutes to stay under GitHub's 60 req/hr unauthenticated limit. On fetch failures, `status` and `devices --check-updates` warn to stderr and show `—` rather than erroring.
+Apply side (gated by `[firmware] enabled = true`, default true). The .bin must be supplied by the operator — TRMNL upstream releases on GitHub carry no asset attachments:
+
+```
+flipper firmware import <path|url> --version <v> --model <m>   # add a .bin to the local store
+flipper firmware binaries                                      # list imported binaries
+flipper firmware remove <version> --model <m>                  # delete a binary
+flipper firmware update <mac> <version>                        # arm a one-shot OTA (prompts; --yes to skip, --force to bypass version match)
+flipper firmware cancel <mac>                                  # disarm a pending update
+flipper firmware armed                                         # list devices with a pending arm
+```
+
+The flash runs on the next `/api/display` poll: Flipper returns a response with `update_firmware=true` and `firmware_url` pointing at `/firmware/{filename}`. The arm is consumed by that single dispatch — a failed flash never auto-retries (the operator must re-arm), and a model mismatch between the arm and the device's `Model` header drops the arm with a logged error. Binaries live in `$XDG_DATA_HOME/flipper/firmware/`; pending arms in `$XDG_DATA_HOME/flipper/firmware-pending.json` (file-locked so concurrent CLI/server processes don't lose arms).
 
 ### Config CLI
 
