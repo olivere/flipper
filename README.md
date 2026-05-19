@@ -145,8 +145,8 @@ The device will call `/api/setup` to register, then `/api/display` to fetch its 
 
 ```bash
 $ ./bin/flipper devices
-MAC                NAME         FIRMWARE  BATTERY  RSSI  MODEL  LAST SEEN
-AA:BB:CC:DD:EE:FF  —            1.7.4     4.07     -65   og     2m ago
+MAC                NAME         FIRMWARE  BATTERY      RSSI  MODEL  LAST SEEN
+AA:BB:CC:DD:EE:FF  —            1.7.4     4.07V (89%)  -65   og     2m ago
 ```
 
 ### Managing devices
@@ -165,7 +165,7 @@ AA:BB:CC:DD:EE:FF  —            1.7.4     4.07     -65   og     2m ago
 ./bin/flipper devices remove AA:BB:CC:DD:EE:FF
 ```
 
-Device telemetry (firmware version, battery voltage, WiFi RSSI, model) is captured automatically from headers sent by the device on each display request.
+Device telemetry (firmware version, battery voltage, WiFi RSSI, model) is captured automatically from headers sent by the device on each display request. The battery percentage shown next to the voltage is derived using the formula published in TRMNL's [battery FAQ](https://help.trmnl.com/en/articles/10556850-device-battery-faq) (`pct = (voltage - 3) / 0.012`, clamped to 0–100).
 
 ### Reverse proxy (advanced)
 

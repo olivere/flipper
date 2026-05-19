@@ -106,7 +106,7 @@ flipper devices rename <mac> <name>      # set friendly name
 flipper devices remove <mac>             # remove from registry
 ```
 
-Telemetry (firmware version, battery voltage, WiFi RSSI, model) is captured from device headers on each `/api/display` request and stored in `devices.json`.
+Telemetry (firmware version, battery voltage, WiFi RSSI, model) is captured from device headers on each `/api/display` request and stored in `devices.json`. The `BATTERY` column in the table view shows the voltage plus an estimated percentage (e.g. `4.07V (89%)`) derived using TRMNL's published formula `(voltage - 3) / 0.012`, clamped to 0–100.
 
 ### Config CLI
 

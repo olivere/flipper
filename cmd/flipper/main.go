@@ -75,7 +75,7 @@ func main() {
 					d.MAC,
 					valOrDash(d.Name),
 					valOrDash(d.Telemetry.FirmwareVersion),
-					valOrDash(d.Telemetry.BatteryVoltage),
+					formatBattery(d.Telemetry),
 					valOrDash(d.Telemetry.WifiRSSI),
 					valOrDash(d.Telemetry.Model),
 					formatAge(d.LastSeen),
@@ -166,6 +166,17 @@ func valOrDash(s string) string {
 		return "—"
 	}
 	return s
+}
+
+func formatBattery(t device.Telemetry) string {
+	if t.BatteryVoltage == "" {
+		return "—"
+	}
+	pct := t.BatteryPercent()
+	if pct < 0 {
+		return t.BatteryVoltage
+	}
+	return fmt.Sprintf("%sV (%d%%)", t.BatteryVoltage, pct)
 }
 
 func formatAge(t time.Time) string {
