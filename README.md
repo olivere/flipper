@@ -9,7 +9,7 @@ A self-hosted display server for [TRMNL](https://usetrmnl.com) e-ink devices. Po
 3. Your TRMNL device fetches the next image on each refresh cycle
 4. Images rotate in order, no cloud service needed
 
-Flipper supports TRMNL OG (800×480, B&W) and TRMNL X (1872×1404, grayscale) devices. Device capabilities are detected automatically from request headers.
+Flipper supports TRMNL OG (800×480, B&W) and TRMNL X (1872×1404, 16-level grayscale) devices. Device capabilities are detected automatically from request headers. When multiple devices poll the same server, each advances through the playlist independently.
 
 ## Getting started
 

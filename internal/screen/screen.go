@@ -104,16 +104,18 @@ type Screen interface {
 	Render(ctx context.Context, opts RenderOpts) (image.Image, error)
 }
 
-// Registry holds screens and supports round-robin rotation.
+// Registry holds screens and supports round-robin rotation. Each
+// device rotates independently, keyed by its ID, so multiple devices
+// polling the same server each see the full sequence.
 type Registry struct {
 	mu      sync.Mutex
 	screens []Screen
-	index   int
+	pos     map[string]int
 }
 
 // NewRegistry returns an empty screen registry.
 func NewRegistry() *Registry {
-	return &Registry{}
+	return &Registry{pos: make(map[string]int)}
 }
 
 func (r *Registry) Add(s Screen) {
@@ -122,26 +124,27 @@ func (r *Registry) Add(s Screen) {
 	r.screens = append(r.screens, s)
 }
 
-// Current returns the current screen without advancing.
-func (r *Registry) Current() Screen {
+// Current returns deviceID's current screen without advancing.
+func (r *Registry) Current(deviceID string) Screen {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if len(r.screens) == 0 {
 		return nil
 	}
-	return r.screens[r.index%len(r.screens)]
+	return r.screens[r.pos[deviceID]%len(r.screens)]
 }
 
-// Next returns the current screen and advances to the next one.
-func (r *Registry) Next() Screen {
+// Next returns deviceID's current screen and advances that device's
+// cursor to the next one.
+func (r *Registry) Next(deviceID string) Screen {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if len(r.screens) == 0 {
 		return nil
 	}
-	s := r.screens[r.index]
-	r.index = (r.index + 1) % len(r.screens)
-	return s
+	i := r.pos[deviceID] % len(r.screens)
+	r.pos[deviceID] = (i + 1) % len(r.screens)
+	return r.screens[i]
 }
 
 func (r *Registry) Len() int {

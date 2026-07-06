@@ -18,7 +18,7 @@ type ColorMode int
 
 const (
 	ColorBW    ColorMode = iota // 1-bit black & white (TRMNL OG)
-	ColorGray4                  // 4-level grayscale (TRMNL X)
+	ColorGray4                  // 4-bit grayscale, 16 levels (TRMNL X)
 )
 
 // DeviceProfile describes a TRMNL device's display capabilities.
@@ -124,17 +124,19 @@ func encodeOriginal(img *image.NRGBA) (*Result, error) {
 }
 
 func encodeX(img *image.NRGBA) (*Result, error) {
-	// 4-level grayscale dithering
-	palette := []color.Color{
-		color.NRGBA{R: 0x00, G: 0x00, B: 0x00, A: 0xff}, // #000
-		color.NRGBA{R: 0x55, G: 0x55, B: 0x55, A: 0xff}, // #555
-		color.NRGBA{R: 0xaa, G: 0xaa, B: 0xaa, A: 0xff}, // #aaa
-		color.NRGBA{R: 0xff, G: 0xff, B: 0xff, A: 0xff}, // #fff
+	// 16-level grayscale dithering, matching the panel's native depth.
+	// DitherPaletted yields an image.Paletted, which the PNG encoder
+	// writes as 4-bit palette data — the format the firmware expects
+	// (and a fraction of the size of an RGBA PNG).
+	palette := make([]color.Color, 16)
+	for i := range palette {
+		v := uint8(i * 0x11)
+		palette[i] = color.NRGBA{R: v, G: v, B: v, A: 0xff}
 	}
 	d := dither.NewDitherer(palette)
 	d.Matrix = dither.FloydSteinberg
 
-	dithered := d.Dither(img)
+	dithered := d.DitherPaletted(img)
 
 	// Encode as PNG
 	var buf bytes.Buffer

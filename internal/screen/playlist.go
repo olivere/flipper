@@ -15,15 +15,18 @@ type PlaylistEntry struct {
 
 // Playlist is an ordered sequence of screens with per-entry durations.
 // It replaces the Registry's round-robin rotation when configured.
+// Each device advances through the playlist independently, keyed by
+// its ID, so multiple devices polling the same server each see the
+// full sequence.
 type Playlist struct {
 	mu      sync.Mutex
 	entries []PlaylistEntry
-	index   int
+	pos     map[string]int
 }
 
 // NewPlaylist returns an empty playlist.
 func NewPlaylist() *Playlist {
-	return &Playlist{}
+	return &Playlist{pos: make(map[string]int)}
 }
 
 // Add appends a screen entry to the playlist.
@@ -33,16 +36,17 @@ func (p *Playlist) Add(scr Screen, d time.Duration) {
 	p.entries = append(p.entries, PlaylistEntry{Screen: scr, Duration: d})
 }
 
-// Next returns the current entry's screen and duration, then advances
-// to the next position. Returns (nil, 0) if the playlist is empty.
-func (p *Playlist) Next() (Screen, time.Duration) {
+// Next returns the entry at deviceID's current position, then advances
+// that device's cursor. Returns (nil, 0) if the playlist is empty.
+func (p *Playlist) Next(deviceID string) (Screen, time.Duration) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	if len(p.entries) == 0 {
 		return nil, 0
 	}
-	e := p.entries[p.index]
-	p.index = (p.index + 1) % len(p.entries)
+	i := p.pos[deviceID] % len(p.entries)
+	p.pos[deviceID] = (i + 1) % len(p.entries)
+	e := p.entries[i]
 	return e.Screen, e.Duration
 }
 

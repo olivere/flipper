@@ -72,15 +72,15 @@ func (h *Handler) Display(w http.ResponseWriter, r *http.Request) {
 	refreshRate := h.Config.Device.RefreshRate
 
 	if h.Playlist != nil && h.Playlist.Len() > 0 {
-		s, dur := h.Playlist.Next()
+		s, dur := h.Playlist.Next(mac)
 		scr = s
 		if dur > 0 {
 			refreshRate = int(dur.Seconds())
 		}
 	} else if h.Config.Screens.Rotate {
-		scr = h.Screens.Next()
+		scr = h.Screens.Next(mac)
 	} else {
-		scr = h.Screens.Current()
+		scr = h.Screens.Current(mac)
 	}
 	if scr == nil {
 		http.Error(w, "no screens configured", http.StatusServiceUnavailable)

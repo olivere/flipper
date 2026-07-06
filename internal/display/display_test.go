@@ -1,8 +1,10 @@
 package display
 
 import (
+	"bytes"
 	"image"
 	"image/color"
+	"image/png"
 	"testing"
 )
 
@@ -78,6 +80,27 @@ func TestProcessX(t *testing.T) {
 	// PNG magic bytes
 	if result.Data[0] != 0x89 || result.Data[1] != 'P' {
 		t.Errorf("expected PNG magic bytes, got %x %x", result.Data[0], result.Data[1])
+	}
+
+	// The X panel has 16 native gray levels; verify the output is a
+	// paletted PNG using the full 16-level palette.
+	decoded, err := png.Decode(bytes.NewReader(result.Data))
+	if err != nil {
+		t.Fatal(err)
+	}
+	paletted, ok := decoded.(*image.Paletted)
+	if !ok {
+		t.Fatalf("expected paletted PNG, got %T", decoded)
+	}
+	if len(paletted.Palette) != 16 {
+		t.Errorf("expected 16-color palette, got %d", len(paletted.Palette))
+	}
+	used := make(map[uint8]bool)
+	for _, idx := range paletted.Pix {
+		used[idx] = true
+	}
+	if len(used) <= 4 {
+		t.Errorf("expected gradient to use more than 4 gray levels, got %d", len(used))
 	}
 }
 
