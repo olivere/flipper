@@ -37,6 +37,7 @@ type Firmware struct {
 type ImageCache struct {
 	mu         sync.RWMutex
 	byFilename map[string]*display.Result
+	order      []string // insertion order, oldest first
 }
 
 func NewImageCache() *ImageCache {
@@ -52,14 +53,20 @@ func (c *ImageCache) GetByFilename(filename string) *display.Result {
 }
 
 // maxCacheEntries limits the number of processed images kept in memory.
-// When exceeded, the oldest entries are evicted by clearing the map.
+// When full, the oldest entry is evicted — never the one just added,
+// so an image_url handed to a device stays fetchable.
 const maxCacheEntries = 64
 
 func (c *ImageCache) Set(result *display.Result) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	if len(c.byFilename) >= maxCacheEntries {
-		clear(c.byFilename)
+	if _, ok := c.byFilename[result.Filename]; ok {
+		return
+	}
+	for len(c.byFilename) >= maxCacheEntries {
+		delete(c.byFilename, c.order[0])
+		c.order = c.order[1:]
 	}
 	c.byFilename[result.Filename] = result
+	c.order = append(c.order, result.Filename)
 }

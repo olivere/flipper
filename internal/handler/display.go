@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/olivere/flipper/internal/device"
 	"github.com/olivere/flipper/internal/display"
@@ -29,7 +30,9 @@ type displayResponse struct {
 }
 
 func (h *Handler) Display(w http.ResponseWriter, r *http.Request) {
-	mac := r.Header.Get("ID")
+	// Normalize the MAC the same way the device registry does, so the
+	// per-device rotation cursors survive a change in header casing.
+	mac := strings.ToUpper(strings.TrimSpace(r.Header.Get("ID")))
 	token := r.Header.Get("Access-Token")
 
 	if mac == "" || token == "" {
@@ -72,15 +75,15 @@ func (h *Handler) Display(w http.ResponseWriter, r *http.Request) {
 	refreshRate := h.Config.Device.RefreshRate
 
 	if h.Playlist != nil && h.Playlist.Len() > 0 {
-		s, dur := h.Playlist.Next()
+		s, dur := h.Playlist.Next(mac)
 		scr = s
 		if dur > 0 {
 			refreshRate = int(dur.Seconds())
 		}
 	} else if h.Config.Screens.Rotate {
-		scr = h.Screens.Next()
+		scr = h.Screens.Next(mac)
 	} else {
-		scr = h.Screens.Current()
+		scr = h.Screens.Current(mac)
 	}
 	if scr == nil {
 		http.Error(w, "no screens configured", http.StatusServiceUnavailable)
