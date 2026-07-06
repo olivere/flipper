@@ -7,8 +7,6 @@ import (
 
 	"github.com/olivere/flipper/internal/config"
 	"github.com/olivere/flipper/internal/screen"
-
-	_ "github.com/olivere/flipper/internal/screen/demo"
 )
 
 func testLogger() *slog.Logger {
@@ -78,5 +76,44 @@ func TestBuildPlaylistsUnknownAssignment(t *testing.T) {
 	}
 	if _, err := buildPlaylists(cfg, screen.NewRegistry(), testLogger()); err == nil {
 		t.Fatal("expected error for assignment to unknown playlist")
+	}
+}
+
+func TestBuildPlaylistsDanglingAssignmentWithoutPlaylists(t *testing.T) {
+	cfg := &config.Config{
+		Devices: map[string]config.DeviceOverride{
+			"AA:BB:CC:00:00:01": {Playlist: "office"},
+		},
+	}
+	if _, err := buildPlaylists(cfg, screen.NewRegistry(), testLogger()); err == nil {
+		t.Fatal("expected error for assignment with no playlists defined")
+	}
+}
+
+func TestBuildPlaylistsDuplicateDeviceKeys(t *testing.T) {
+	cfg := &config.Config{
+		Playlists: map[string][]config.PlaylistEntry{
+			"office":  demoEntries(1),
+			"kitchen": demoEntries(1),
+		},
+		// Distinct TOML keys, same MAC after normalization.
+		Devices: map[string]config.DeviceOverride{
+			"aa:bb:cc:00:00:01": {Playlist: "office"},
+			"AA:BB:CC:00:00:01": {Playlist: "kitchen"},
+		},
+	}
+	if _, err := buildPlaylists(cfg, screen.NewRegistry(), testLogger()); err == nil {
+		t.Fatal("expected error for [devices] sections colliding after MAC normalization")
+	}
+}
+
+func TestBuildPlaylistsNoUsableEntries(t *testing.T) {
+	cfg := &config.Config{
+		Playlists: map[string][]config.PlaylistEntry{
+			"office": {{Screen: "no-such-screen", Duration: "60s"}},
+		},
+	}
+	if _, err := buildPlaylists(cfg, screen.NewRegistry(), testLogger()); err == nil {
+		t.Fatal("expected error for playlist with no usable entries")
 	}
 }

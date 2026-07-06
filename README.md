@@ -139,7 +139,8 @@ Rules:
 
 - A device with a `playlist` assignment uses that named playlist; all other devices use the top-level `[[playlist]]`.
 - If there is no top-level `[[playlist]]` and exactly one named playlist exists, it serves all devices — the `playlist` assignment is optional in a single-playlist setup.
-- An assignment referencing an unknown playlist name is a startup error.
+- Misconfigurations are startup errors rather than silent surprises: an assignment referencing an unknown playlist name (even when no playlists are defined at all), two `[devices]` sections that resolve to the same MAC after normalization, and a playlist with no usable entries all refuse to start.
+- With multiple named playlists and no top-level `[[playlist]]`, unassigned devices fall back to `screens.rotate` behavior — a startup warning points this out. Defined-but-unassigned playlists are also flagged with a warning.
 - Every device advances through its playlist independently; two devices on the same playlist each see the full sequence.
 
 ### HTTPS

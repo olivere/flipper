@@ -167,10 +167,22 @@ func requestLogger(logger *slog.Logger) func(http.Handler) http.Handler {
 // per-device assignments. Devices without an assignment use the
 // top-level [[playlist]]; when that is empty and exactly one named
 // playlist exists, it becomes the default. Returns nil when no
-// playlists are configured at all. An assignment referencing an
-// unknown playlist name is a startup error.
+// playlists are configured at all.
+//
+// Misconfigurations fail at startup rather than degrading silently:
+// an assignment referencing an unknown playlist (including when no
+// playlists are defined at all), two [devices] sections that collide
+// after MAC normalization, and a playlist whose entries were all
+// skipped are errors.
 func buildPlaylists(cfg *config.Config, screens *screen.Registry, logger *slog.Logger) (*screen.Playlists, error) {
 	if len(cfg.Playlist) == 0 && len(cfg.Playlists) == 0 {
+		// A dangling assignment is still a config error, not
+		// something to silently ignore.
+		for mac, override := range cfg.Devices {
+			if override.Playlist != "" {
+				return nil, fmt.Errorf("device %q references unknown playlist %q", mac, override.Playlist)
+			}
+		}
 		return nil, nil
 	}
 
@@ -184,7 +196,7 @@ func buildPlaylists(cfg *config.Config, screens *screen.Registry, logger *slog.L
 		}
 	}
 
-	build := func(name string, entries []config.PlaylistEntry) *screen.Playlist {
+	build := func(name string, entries []config.PlaylistEntry) (*screen.Playlist, error) {
 		pl := screen.NewPlaylist()
 		for _, entry := range entries {
 			dur, err := parseDuration(entry.Duration)
@@ -208,19 +220,30 @@ func buildPlaylists(cfg *config.Config, screens *screen.Registry, logger *slog.L
 			}
 			pl.Add(scr, dur)
 		}
+		if pl.Len() == 0 {
+			return nil, fmt.Errorf("playlist %q has no usable entries", name)
+		}
 		logger.Info("playlist enabled", "playlist", name, "entries", pl.Len())
-		return pl
+		return pl, nil
 	}
 
 	playlists := &screen.Playlists{ByDevice: make(map[string]*screen.Playlist)}
 
 	if len(cfg.Playlist) > 0 {
-		playlists.Default = build("default", cfg.Playlist)
+		pl, err := build("default", cfg.Playlist)
+		if err != nil {
+			return nil, err
+		}
+		playlists.Default = pl
 	}
 
 	named := make(map[string]*screen.Playlist, len(cfg.Playlists))
 	for name, entries := range cfg.Playlists {
-		named[name] = build(name, entries)
+		pl, err := build(name, entries)
+		if err != nil {
+			return nil, err
+		}
+		named[name] = pl
 	}
 
 	// A single named playlist with no explicit default serves everyone.
@@ -230,15 +253,31 @@ func buildPlaylists(cfg *config.Config, screens *screen.Registry, logger *slog.L
 		}
 	}
 
+	assigned := make(map[string]bool, len(cfg.Devices))
 	for mac, override := range cfg.Devices {
 		if override.Playlist == "" {
 			continue
+		}
+		key := device.NormalizeMAC(mac)
+		if _, dup := playlists.ByDevice[key]; dup {
+			return nil, fmt.Errorf("multiple [devices] sections resolve to MAC %q", key)
 		}
 		pl, ok := named[override.Playlist]
 		if !ok {
 			return nil, fmt.Errorf("device %q references unknown playlist %q", mac, override.Playlist)
 		}
-		playlists.ByDevice[device.NormalizeMAC(mac)] = pl
+		playlists.ByDevice[key] = pl
+		assigned[override.Playlist] = true
+	}
+
+	if playlists.Default == nil {
+		logger.Warn("no default playlist: devices without an assignment fall back to screens rotation",
+			"named_playlists", len(named))
+	}
+	for name, pl := range named {
+		if !assigned[name] && pl != playlists.Default {
+			logger.Warn("playlist defined but not assigned to any device", "playlist", name)
+		}
 	}
 
 	return playlists, nil
