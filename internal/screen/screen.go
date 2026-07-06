@@ -110,12 +110,12 @@ type Screen interface {
 type Registry struct {
 	mu      sync.Mutex
 	screens []Screen
-	pos     map[string]int
+	pos     cursors
 }
 
 // NewRegistry returns an empty screen registry.
 func NewRegistry() *Registry {
-	return &Registry{pos: make(map[string]int)}
+	return &Registry{pos: cursors{}}
 }
 
 func (r *Registry) Add(s Screen) {
@@ -131,7 +131,7 @@ func (r *Registry) Current(deviceID string) Screen {
 	if len(r.screens) == 0 {
 		return nil
 	}
-	return r.screens[r.pos[deviceID]%len(r.screens)]
+	return r.screens[r.pos.current(deviceID, len(r.screens))]
 }
 
 // Next returns deviceID's current screen and advances that device's
@@ -142,9 +142,7 @@ func (r *Registry) Next(deviceID string) Screen {
 	if len(r.screens) == 0 {
 		return nil
 	}
-	i := r.pos[deviceID] % len(r.screens)
-	r.pos[deviceID] = (i + 1) % len(r.screens)
-	return r.screens[i]
+	return r.screens[r.pos.next(deviceID, len(r.screens))]
 }
 
 func (r *Registry) Len() int {

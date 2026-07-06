@@ -104,6 +104,33 @@ func TestProcessX(t *testing.T) {
 	}
 }
 
+func TestProcessTransparency(t *testing.T) {
+	p := NewPipeline()
+	// Fully transparent source: must flatten to white, not black.
+	src := image.NewNRGBA(image.Rect(0, 0, 400, 300))
+
+	for _, scaling := range []string{"fit", "fill"} {
+		result, err := p.Process(src, ProfileX, scaling)
+		if err != nil {
+			t.Fatal(err)
+		}
+		decoded, err := png.Decode(bytes.NewReader(result.Data))
+		if err != nil {
+			t.Fatal(err)
+		}
+		paletted, ok := decoded.(*image.Paletted)
+		if !ok {
+			t.Fatalf("%s: expected paletted PNG, got %T", scaling, decoded)
+		}
+		white := uint8(paletted.Palette.Index(color.White))
+		for i, idx := range paletted.Pix {
+			if idx != white {
+				t.Fatalf("%s: pixel %d is palette index %d, want white (%d)", scaling, i, idx, white)
+			}
+		}
+	}
+}
+
 func TestDeterministicHash(t *testing.T) {
 	p := NewPipeline()
 	src := testImage(200, 200)

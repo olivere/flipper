@@ -70,14 +70,13 @@ func (p *Pipeline) Process(src image.Image, profile DeviceProfile, scaling strin
 		resized = imaging.Fit(src, profile.Width, profile.Height, imaging.Lanczos)
 	}
 
-	// For "fit" mode, paste onto white canvas at center
-	if scaling != "fill" {
-		canvas := imaging.New(profile.Width, profile.Height, color.White)
-		offsetX := (profile.Width - resized.Bounds().Dx()) / 2
-		offsetY := (profile.Height - resized.Bounds().Dy()) / 2
-		canvas = imaging.Paste(canvas, resized, image.Pt(offsetX, offsetY))
-		resized = canvas
-	}
+	// Flatten onto a white canvas: centers "fit" output and composites
+	// transparency away — e-ink has no alpha, and the palette encoders
+	// map transparent pixels to black.
+	canvas := imaging.New(profile.Width, profile.Height, color.White)
+	offsetX := (profile.Width - resized.Bounds().Dx()) / 2
+	offsetY := (profile.Height - resized.Bounds().Dy()) / 2
+	resized = imaging.Overlay(canvas, resized, image.Pt(offsetX, offsetY), 1.0)
 
 	// Grayscale
 	gray := imaging.Grayscale(resized)

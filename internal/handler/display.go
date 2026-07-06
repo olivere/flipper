@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/olivere/flipper/internal/device"
 	"github.com/olivere/flipper/internal/display"
@@ -29,7 +30,9 @@ type displayResponse struct {
 }
 
 func (h *Handler) Display(w http.ResponseWriter, r *http.Request) {
-	mac := r.Header.Get("ID")
+	// Normalize the MAC the same way the device registry does, so the
+	// per-device rotation cursors survive a change in header casing.
+	mac := strings.ToUpper(strings.TrimSpace(r.Header.Get("ID")))
 	token := r.Header.Get("Access-Token")
 
 	if mac == "" || token == "" {

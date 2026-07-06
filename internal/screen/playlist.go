@@ -21,12 +21,12 @@ type PlaylistEntry struct {
 type Playlist struct {
 	mu      sync.Mutex
 	entries []PlaylistEntry
-	pos     map[string]int
+	pos     cursors
 }
 
 // NewPlaylist returns an empty playlist.
 func NewPlaylist() *Playlist {
-	return &Playlist{pos: make(map[string]int)}
+	return &Playlist{pos: cursors{}}
 }
 
 // Add appends a screen entry to the playlist.
@@ -44,9 +44,7 @@ func (p *Playlist) Next(deviceID string) (Screen, time.Duration) {
 	if len(p.entries) == 0 {
 		return nil, 0
 	}
-	i := p.pos[deviceID] % len(p.entries)
-	p.pos[deviceID] = (i + 1) % len(p.entries)
-	e := p.entries[i]
+	e := p.entries[p.pos.next(deviceID, len(p.entries))]
 	return e.Screen, e.Duration
 }
 
