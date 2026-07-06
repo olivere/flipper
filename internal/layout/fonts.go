@@ -9,9 +9,13 @@ import (
 	"golang.org/x/image/font"
 )
 
+// The OFL license texts are embedded alongside the fonts so that
+// distributed binaries carry the notices OFL 1.1 requires.
 //go:embed fonts/Inter-Regular.ttf
 //go:embed fonts/Inter-Bold.ttf
 //go:embed fonts/JetBrainsMono-Regular.ttf
+//go:embed fonts/OFL-Inter.txt
+//go:embed fonts/OFL-JetBrainsMono.txt
 var fontsFS embed.FS
 
 // FontStyle selects a font variant.

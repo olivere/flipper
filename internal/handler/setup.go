@@ -51,7 +51,7 @@ func (h *Handler) Setup(w http.ResponseWriter, r *http.Request) {
 
 // friendlyIDFromMAC mirrors TRMNL's friendly-ID convention: the
 // last three octets of the MAC, hex-uppercased, no separators.
-// Example: 94:A9:90:8C:6C:2C -> "8C6C2C". Used as a stable
+// Example: AA:BB:CC:DD:EE:FF -> "DDEEFF". Used as a stable
 // human-readable identifier in firmware logs and UI.
 func friendlyIDFromMAC(mac string) string {
 	clean := strings.ToUpper(strings.ReplaceAll(mac, ":", ""))
