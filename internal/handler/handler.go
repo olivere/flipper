@@ -13,14 +13,14 @@ import (
 
 // Handler holds the shared dependencies for all HTTP handlers.
 type Handler struct {
-	Config   *config.Config
-	Devices  *device.Registry
-	Screens  *screen.Registry
-	Playlist *screen.Playlist
-	Pipeline *display.Pipeline
-	Cache    *ImageCache
-	Firmware *Firmware // nil when firmware support is disabled
-	Logger   *slog.Logger
+	Config    *config.Config
+	Devices   *device.Registry
+	Screens   *screen.Registry
+	Playlists *screen.Playlists // nil when no playlists are configured
+	Pipeline  *display.Pipeline
+	Cache     *ImageCache
+	Firmware  *Firmware // nil when firmware support is disabled
+	Logger    *slog.Logger
 }
 
 // Firmware bundles the local binary store and pending-arm tracker.

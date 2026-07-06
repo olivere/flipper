@@ -13,7 +13,7 @@ internal/
   firmware/         Upstream release metadata + local binary store + one-shot OTA arm tracker
   handler/          HTTP handlers (setup, display, images, log, firmware)
   layout/           Layout system for programmatic screen rendering (fogleman/gg)
-  screen/           Screen interface, playlist, implementations (static, demo, weather, hackernews, news, fcbayern)
+  screen/           Screen interface, playlists (named, per-device via [devices."<mac>"]), implementations (static, demo, weather, hackernews, news, fcbayern)
   selfcert/         Self-signed TLS certificate generation
   server/           Wires everything, runs HTTP server
   xdg/              XDG Base Directory paths (~/.config, ~/.local/share)

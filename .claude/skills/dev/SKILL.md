@@ -63,6 +63,22 @@ rotate = false
 
 [screens.static]
 dir = "~/Pictures/trmnl"
+
+# Optional: playlists. [[playlist]] entries define the default
+# sequence; [[playlists.<name>]] defines a named playlist that can be
+# assigned per device via [devices."<mac>"] (see README "Per-device
+# playlists").
+#
+# [[playlist]]
+# screen = "news"
+# duration = "1m"
+#
+# [[playlists.office]]
+# screen = "weather"
+# duration = "2m"
+#
+# [devices."1C:DB:D4:66:5D:38"]
+# playlist = "office"
 ```
 
 Environment variable overrides: `FLIPPER_ADDR`, `FLIPPER_SECRET_KEY`, `FLIPPER_SETUP_MODE`, `FLIPPER_TLS_DISABLED`, `FLIPPER_TLS_CERT_FILE`, `FLIPPER_TLS_KEY_FILE`, `FLIPPER_WIDTH`, `FLIPPER_HEIGHT`, `FLIPPER_FORMAT`, `FLIPPER_REFRESH_RATE`, `FLIPPER_STATIC_DIR`.

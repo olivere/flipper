@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
-	"strings"
 
 	"github.com/olivere/flipper/internal/device"
 	"github.com/olivere/flipper/internal/display"
@@ -30,9 +29,10 @@ type displayResponse struct {
 }
 
 func (h *Handler) Display(w http.ResponseWriter, r *http.Request) {
-	// Normalize the MAC the same way the device registry does, so the
-	// per-device rotation cursors survive a change in header casing.
-	mac := strings.ToUpper(strings.TrimSpace(r.Header.Get("ID")))
+	// Normalize the MAC the same way the device registry does, so
+	// per-device cursors and playlist assignments survive a change in
+	// header casing.
+	mac := device.NormalizeMAC(r.Header.Get("ID"))
 	token := r.Header.Get("Access-Token")
 
 	if mac == "" || token == "" {
@@ -70,12 +70,13 @@ func (h *Handler) Display(w http.ResponseWriter, r *http.Request) {
 	height := headerInt(r, "HEIGHT", h.Config.Device.Height)
 	profile := display.DetectProfile(width, height)
 
-	// Get current screen: playlist takes priority, then registry rotation.
+	// Get current screen: the device's playlist takes priority, then
+	// registry rotation.
 	var scr screen.Screen
 	refreshRate := h.Config.Device.RefreshRate
 
-	if h.Playlist != nil && h.Playlist.Len() > 0 {
-		s, dur := h.Playlist.Next(mac)
+	if pl := h.Playlists.For(mac); pl != nil && pl.Len() > 0 {
+		s, dur := pl.Next(mac)
 		scr = s
 		if dur > 0 {
 			refreshRate = int(dur.Seconds())
