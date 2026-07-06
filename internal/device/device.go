@@ -94,7 +94,7 @@ func WithPath(path string) RegistryOption {
 // derives its API key from the server secret. If the device already
 // exists, its LastSeen timestamp is updated instead.
 func (r *Registry) Register(mac string) (*Device, error) {
-	mac = normMAC(mac)
+	mac = NormalizeMAC(mac)
 	apiKey := deriveKey(r.secretKey, mac)
 	now := time.Now().UTC()
 
@@ -123,7 +123,7 @@ func (r *Registry) Register(mac string) (*Device, error) {
 // Authenticate returns true if mac is a registered device whose stored
 // API key matches token.
 func (r *Registry) Authenticate(mac, token string) bool {
-	mac = normMAC(mac)
+	mac = NormalizeMAC(mac)
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
@@ -139,7 +139,7 @@ func (r *Registry) Authenticate(mac, token string) bool {
 // TRMNL cloud) instead of using the key Flipper derived during setup.
 // Returns true if the device exists and the token is now valid.
 func (r *Registry) AdoptToken(mac, token string) bool {
-	mac = normMAC(mac)
+	mac = NormalizeMAC(mac)
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -159,7 +159,7 @@ func (r *Registry) AdoptToken(mac, token string) bool {
 // are throttled to at most once per 30 seconds to reduce disk I/O,
 // unless the telemetry data has changed.
 func (r *Registry) Touch(mac string, t Telemetry) {
-	mac = normMAC(mac)
+	mac = NormalizeMAC(mac)
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -179,7 +179,7 @@ func (r *Registry) Touch(mac string, t Telemetry) {
 // Remove deletes a device from the registry. Returns false if the
 // device is not registered.
 func (r *Registry) Remove(mac string) bool {
-	mac = normMAC(mac)
+	mac = NormalizeMAC(mac)
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -194,7 +194,7 @@ func (r *Registry) Remove(mac string) bool {
 // SetName sets a friendly name for a device. Returns false if the
 // device is not registered.
 func (r *Registry) SetName(mac, name string) bool {
-	mac = normMAC(mac)
+	mac = NormalizeMAC(mac)
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -211,7 +211,7 @@ func (r *Registry) SetName(mac, name string) bool {
 // redacted, plus an ok flag. Used by callers that need just one
 // device's telemetry without scanning the full List.
 func (r *Registry) Get(mac string) (*Device, bool) {
-	mac = normMAC(mac)
+	mac = NormalizeMAC(mac)
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 	d, ok := r.devices[mac]
@@ -276,6 +276,8 @@ func deriveKey(secret, mac string) string {
 	return fmt.Sprintf("%x", h.Sum(nil))
 }
 
-func normMAC(mac string) string {
+// NormalizeMAC canonicalizes a device MAC address the way the
+// registry stores it: uppercased, surrounding whitespace removed.
+func NormalizeMAC(mac string) string {
 	return strings.ToUpper(strings.TrimSpace(mac))
 }

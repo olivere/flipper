@@ -60,43 +60,9 @@ func Run(ctx context.Context, cfg *config.Config) error {
 		}
 	}
 
-	// Build playlist if configured.
-	var playlist *screen.Playlist
-	if len(cfg.Playlist) > 0 {
-		playlist = screen.NewPlaylist()
-
-		// Reuse the static screen instance across playlist entries so all
-		// "static" entries share the same directory scanner and index.
-		var staticScreen screen.Screen
-		for _, s := range screens.All() {
-			if s.Name() == "static" {
-				staticScreen = s
-				break
-			}
-		}
-
-		for _, entry := range cfg.Playlist {
-			dur, err := parseDuration(entry.Duration)
-			if err != nil {
-				logger.Warn("invalid playlist duration, skipping entry",
-					"screen", entry.Screen, "duration", entry.Duration, "err", err)
-				continue
-			}
-
-			// For static, reuse the shared instance instead of creating a new one.
-			if entry.Screen == "static" && staticScreen != nil {
-				playlist.Add(staticScreen, dur)
-				continue
-			}
-
-			scr, err := screen.Build(entry.Screen, cfg, entry.Params)
-			if err != nil {
-				logger.Warn("playlist screen skipped", "screen", entry.Screen, "err", err)
-				continue
-			}
-			playlist.Add(scr, dur)
-		}
-		logger.Info("playlist enabled", "entries", playlist.Len())
+	playlists, err := buildPlaylists(cfg, screens, logger)
+	if err != nil {
+		return err
 	}
 
 	var fw *handler.Firmware
@@ -114,14 +80,14 @@ func Run(ctx context.Context, cfg *config.Config) error {
 	}
 
 	h := &handler.Handler{
-		Config:   cfg,
-		Devices:  registry,
-		Screens:  screens,
-		Playlist: playlist,
-		Pipeline: pipeline,
-		Cache:    cache,
-		Firmware: fw,
-		Logger:   logger,
+		Config:    cfg,
+		Devices:   registry,
+		Screens:   screens,
+		Playlists: playlists,
+		Pipeline:  pipeline,
+		Cache:     cache,
+		Firmware:  fw,
+		Logger:    logger,
 	}
 
 	r := chi.NewRouter()
@@ -195,6 +161,87 @@ func requestLogger(logger *slog.Logger) func(http.Handler) http.Handler {
 			)
 		})
 	}
+}
+
+// buildPlaylists assembles the default and named playlists and the
+// per-device assignments. Devices without an assignment use the
+// top-level [[playlist]]; when that is empty and exactly one named
+// playlist exists, it becomes the default. Returns nil when no
+// playlists are configured at all. An assignment referencing an
+// unknown playlist name is a startup error.
+func buildPlaylists(cfg *config.Config, screens *screen.Registry, logger *slog.Logger) (*screen.Playlists, error) {
+	if len(cfg.Playlist) == 0 && len(cfg.Playlists) == 0 {
+		return nil, nil
+	}
+
+	// Reuse the static screen instance across all playlist entries so
+	// "static" entries share the same directory scanner and index.
+	var staticScreen screen.Screen
+	for _, s := range screens.All() {
+		if s.Name() == "static" {
+			staticScreen = s
+			break
+		}
+	}
+
+	build := func(name string, entries []config.PlaylistEntry) *screen.Playlist {
+		pl := screen.NewPlaylist()
+		for _, entry := range entries {
+			dur, err := parseDuration(entry.Duration)
+			if err != nil {
+				logger.Warn("invalid playlist duration, skipping entry",
+					"playlist", name, "screen", entry.Screen, "duration", entry.Duration, "err", err)
+				continue
+			}
+
+			// For static, reuse the shared instance instead of creating a new one.
+			if entry.Screen == "static" && staticScreen != nil {
+				pl.Add(staticScreen, dur)
+				continue
+			}
+
+			scr, err := screen.Build(entry.Screen, cfg, entry.Params)
+			if err != nil {
+				logger.Warn("playlist screen skipped",
+					"playlist", name, "screen", entry.Screen, "err", err)
+				continue
+			}
+			pl.Add(scr, dur)
+		}
+		logger.Info("playlist enabled", "playlist", name, "entries", pl.Len())
+		return pl
+	}
+
+	playlists := &screen.Playlists{ByDevice: make(map[string]*screen.Playlist)}
+
+	if len(cfg.Playlist) > 0 {
+		playlists.Default = build("default", cfg.Playlist)
+	}
+
+	named := make(map[string]*screen.Playlist, len(cfg.Playlists))
+	for name, entries := range cfg.Playlists {
+		named[name] = build(name, entries)
+	}
+
+	// A single named playlist with no explicit default serves everyone.
+	if playlists.Default == nil && len(named) == 1 {
+		for _, pl := range named {
+			playlists.Default = pl
+		}
+	}
+
+	for mac, override := range cfg.Devices {
+		if override.Playlist == "" {
+			continue
+		}
+		pl, ok := named[override.Playlist]
+		if !ok {
+			return nil, fmt.Errorf("device %q references unknown playlist %q", mac, override.Playlist)
+		}
+		playlists.ByDevice[device.NormalizeMAC(mac)] = pl
+	}
+
+	return playlists, nil
 }
 
 // parseDuration parses a duration string like "2m", "60s", or "".

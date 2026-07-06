@@ -9,7 +9,7 @@ A self-hosted display server for [TRMNL](https://usetrmnl.com) e-ink devices. Po
 3. Your TRMNL device fetches the next image on each refresh cycle
 4. Images rotate in order, no cloud service needed
 
-Flipper supports TRMNL OG (800×480, B&W) and TRMNL X (1872×1404, 16-level grayscale) devices. Device capabilities are detected automatically from request headers. When multiple devices poll the same server, each advances through the playlist independently.
+Flipper supports TRMNL OG (800×480, B&W) and TRMNL X (1872×1404, 16-level grayscale) devices. Device capabilities are detected automatically from request headers. When multiple devices poll the same server, each advances through its playlist independently — and each device can be assigned its own playlist (see [Per-device playlists](#per-device-playlists)).
 
 ## Getting started
 
@@ -109,6 +109,38 @@ duration = "60s"
 | `params.*` | Screen-specific parameters (e.g. `params.city` for weather) |
 
 The same screen type can appear multiple times with different parameters (e.g. weather for different cities). Unknown screen types are skipped with a warning. When no playlist is defined, the existing `screens.rotate` behavior applies.
+
+### Per-device playlists
+
+Multiple devices can each have their own playlist. Define named playlists with `[[playlists.<name>]]` sections (same entry format as `[[playlist]]`), then assign a device by MAC address:
+
+```toml
+# Default playlist for any device without an assignment
+[[playlist]]
+screen = "news"
+duration = "1m"
+
+# Named playlist
+[[playlists.office]]
+screen = "weather"
+duration = "2m"
+params.city = "Munich"
+
+[[playlists.office]]
+screen = "hackernews"
+duration = "60s"
+
+# Assign a device (MAC is case-insensitive)
+[devices."1C:DB:D4:66:5D:38"]
+playlist = "office"
+```
+
+Rules:
+
+- A device with a `playlist` assignment uses that named playlist; all other devices use the top-level `[[playlist]]`.
+- If there is no top-level `[[playlist]]` and exactly one named playlist exists, it serves all devices — the `playlist` assignment is optional in a single-playlist setup.
+- An assignment referencing an unknown playlist name is a startup error.
+- Every device advances through its playlist independently; two devices on the same playlist each see the full sequence.
 
 ### HTTPS
 

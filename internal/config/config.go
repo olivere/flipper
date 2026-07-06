@@ -20,6 +20,21 @@ type Config struct {
 	Screens  ScreensConfig   `toml:"screens"`
 	Firmware FirmwareConfig  `toml:"firmware"`
 	Playlist []PlaylistEntry `toml:"playlist"`
+
+	// Playlists holds named playlists for per-device assignment via
+	// the [devices."<mac>"] sections. Devices without an assignment
+	// use the top-level Playlist; if that is empty and exactly one
+	// named playlist exists, it becomes the default.
+	Playlists map[string][]PlaylistEntry `toml:"playlists"`
+
+	// Devices holds per-device overrides keyed by MAC address.
+	Devices map[string]DeviceOverride `toml:"devices"`
+}
+
+// DeviceOverride is per-device configuration keyed by MAC in the
+// [devices."<mac>"] config sections.
+type DeviceOverride struct {
+	Playlist string `toml:"playlist"`
 }
 
 // FirmwareConfig gates the firmware OTA feature. When Enabled is
