@@ -77,7 +77,7 @@ dir = "~/Pictures/trmnl"
 # screen = "weather"
 # duration = "2m"
 #
-# [devices."1C:DB:D4:66:5D:38"]
+# [devices."AA:BB:CC:DD:EE:FF"]
 # playlist = "office"
 ```
 

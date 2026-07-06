@@ -21,7 +21,7 @@ params.city = "Munich"
 screen = "hackernews"
 duration = "60s"
 
-[devices."1C:DB:D4:66:5D:38"]
+[devices."AA:BB:CC:DD:EE:FF"]
 playlist = "office"
 `
 	path := filepath.Join(t.TempDir(), "config.toml")
@@ -44,7 +44,7 @@ playlist = "office"
 	if city, _ := office[0].Params["city"].(string); city != "Munich" {
 		t.Errorf("expected city param Munich, got %q", city)
 	}
-	ovr, ok := cfg.Devices["1C:DB:D4:66:5D:38"]
+	ovr, ok := cfg.Devices["AA:BB:CC:DD:EE:FF"]
 	if !ok || ovr.Playlist != "office" {
 		t.Errorf("expected device assignment to office, got %+v (ok=%v)", ovr, ok)
 	}

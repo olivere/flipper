@@ -131,7 +131,7 @@ screen = "hackernews"
 duration = "60s"
 
 # Assign a device (MAC is case-insensitive)
-[devices."1C:DB:D4:66:5D:38"]
+[devices."AA:BB:CC:DD:EE:FF"]
 playlist = "office"
 ```
 
@@ -446,4 +446,6 @@ journalctl --user -u flipper -f
 
 ## License
 
-Copyright (c) 2026 Oliver Eilhard. All rights reserved. See [LICENSE](LICENSE).
+MIT — see [LICENSE](LICENSE).
+
+The embedded [Inter](https://github.com/rsms/inter) and [JetBrains Mono](https://github.com/JetBrains/JetBrainsMono) fonts are licensed under the SIL Open Font License 1.1 — see [internal/layout/fonts](internal/layout/fonts).
