@@ -24,6 +24,7 @@ internal/
 ```bash
 make build          # build to bin/flipper
 make test           # run all tests
+make lint           # vet, staticcheck, govulncheck, format checks
 make setup          # go mod tidy
 ./bin/flipper serve  # start server (default :3443, HTTPS)
 ./bin/flipper serve --config ./config.toml  # custom config path

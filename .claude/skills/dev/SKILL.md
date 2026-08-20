@@ -111,6 +111,7 @@ make install   # go install ./cmd/flipper
 make setup     # go mod tidy
 make build     # go build -o bin/flipper ./cmd/flipper
 make test      # go test ./...
+make lint      # go vet + staticcheck + govulncheck + gofmt/gofumpt checks
 ```
 
 ### Device management CLI
