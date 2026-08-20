@@ -154,12 +154,12 @@ func TestDeterministicHash(t *testing.T) {
 
 func TestDetectProfile(t *testing.T) {
 	tests := []struct {
-		w, h    int
-		want    DeviceProfile
+		w, h int
+		want DeviceProfile
 	}{
 		{800, 480, ProfileOG},
 		{1872, 1404, ProfileX},
-		{0, 0, ProfileOG},   // default
+		{0, 0, ProfileOG},     // default
 		{100, 100, ProfileOG}, // unknown defaults to original
 	}
 	for _, tt := range tests {

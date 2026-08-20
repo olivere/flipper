@@ -4,7 +4,7 @@ import "fmt"
 
 // Item represents a single row in an item list.
 type Item struct {
-	Index       int    // displayed if > 0
+	Index       int // displayed if > 0
 	Title       string
 	Description string // optional secondary line
 }
