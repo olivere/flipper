@@ -13,7 +13,7 @@ Flipper supports TRMNL OG (800×480, B&W) and TRMNL X (1872×1404, 16-level gray
 
 ## Getting started
 
-You need Go 1.26+ and `make`.
+You need Go 1.27+ and `make`.
 
 ```bash
 # Build

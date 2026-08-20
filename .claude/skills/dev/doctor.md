@@ -15,7 +15,7 @@ Run all checks, collect results, then print a summary table. For each failure: e
 
 #### 1. Go installed
 - Run `go version`
-- PASS: Go is installed, version >= 1.26
+- PASS: Go is installed, version >= 1.27
 - FAIL: Go not found or version too old
 - Repair: Link to https://go.dev/dl/. On macOS, offer `brew install go`.
 
@@ -136,7 +136,7 @@ Flipper Doctor Summary
 ======================
 
 Build & Dependencies
-  [PASS] Go installed (go1.26.x)
+  [PASS] Go installed (go1.27.x)
   [PASS] Dependencies verified
   [PASS] Build succeeds
   [PASS] Tests pass
