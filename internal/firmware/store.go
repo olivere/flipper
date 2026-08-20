@@ -145,7 +145,8 @@ func (s *Store) Import(ctx context.Context, src, version, model string) (Binary,
 			}
 			return Binary{}, fmt.Errorf(
 				"firmware %s/%s already imported with different bytes (existing sha256 %s); remove it first",
-				version, model, b.SHA256)
+				version, model, b.SHA256,
+			)
 		}
 	}
 

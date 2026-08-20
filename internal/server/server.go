@@ -91,9 +91,10 @@ func Run(ctx context.Context, cfg *config.Config) error {
 	}
 
 	r := chi.NewRouter()
-	r.Use(middleware.Recoverer)
-	r.Use(middleware.RealIP)
+	// Logging wraps recovery so a panicking handler still produces a
+	// request line, with the 500 Recoverer writes as its status.
 	r.Use(requestLogger(logger))
+	r.Use(middleware.Recoverer)
 
 	r.Get("/api/setup", h.Setup)
 	r.Get("/api/display", h.Display)
@@ -152,7 +153,8 @@ func requestLogger(logger *slog.Logger) func(http.Handler) http.Handler {
 			start := time.Now()
 			ww := middleware.NewWrapResponseWriter(w, r.ProtoMajor)
 			next.ServeHTTP(ww, r)
-			logger.Info(fmt.Sprintf("%s %s", r.Method, r.URL.Path),
+			logger.Info(
+				fmt.Sprintf("%s %s", r.Method, r.URL.Path),
 				"status", ww.Status(),
 				"bytes", ww.BytesWritten(),
 				"duration", time.Since(start).String(),

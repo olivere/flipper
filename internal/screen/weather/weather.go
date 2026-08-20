@@ -57,8 +57,8 @@ type Config struct {
 // Screen renders weather information for a configured city.
 type Screen struct {
 	cfg     Config
-	client  *Client  // shared client for geocoding
-	fetcher Fetcher  // weather data fetcher (service-specific)
+	client  *Client // shared client for geocoding
+	fetcher Fetcher // weather data fetcher (service-specific)
 	mu      sync.Mutex
 	loc     *Location
 	cache   *WeatherData

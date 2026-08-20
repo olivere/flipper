@@ -136,7 +136,8 @@ func (h *Handler) tryDispatchFirmware(w http.ResponseWriter, r *http.Request, ma
 
 	deviceModel := r.Header.Get("Model")
 	if arm.Model != "" && arm.Model != deviceModel {
-		h.Logger.Error("firmware arm model mismatch — refusing to dispatch",
+		h.Logger.Error(
+			"firmware arm model mismatch — refusing to dispatch",
 			"mac", mac,
 			"want_model", arm.Model,
 			"got_model", deviceModel,
@@ -147,7 +148,8 @@ func (h *Handler) tryDispatchFirmware(w http.ResponseWriter, r *http.Request, ma
 	}
 
 	if _, exists := h.Firmware.Store.FindByFilename(arm.Filename); !exists {
-		h.Logger.Error("firmware arm references missing binary — refusing to dispatch",
+		h.Logger.Error(
+			"firmware arm references missing binary — refusing to dispatch",
 			"mac", mac, "file", arm.Filename, "version", arm.Version,
 		)
 		return false
@@ -160,7 +162,8 @@ func (h *Handler) tryDispatchFirmware(w http.ResponseWriter, r *http.Request, ma
 	url := fmt.Sprintf("%s://%s/firmware/%s", scheme, r.Host, arm.Filename)
 
 	writeFirmwareResponse(w, h.Config.Device.RefreshRate, url)
-	h.Logger.Info("firmware update dispatched",
+	h.Logger.Info(
+		"firmware update dispatched",
 		"mac", mac,
 		"version", arm.Version,
 		"model", arm.Model,

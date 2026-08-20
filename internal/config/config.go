@@ -232,7 +232,8 @@ func checkMacOSMigration(activePath string) {
 		return
 	}
 
-	slog.Warn("found config at old macOS path; consider moving it",
+	slog.Warn(
+		"found config at old macOS path; consider moving it",
 		"old", oldPath,
 		"new", newPath,
 	)

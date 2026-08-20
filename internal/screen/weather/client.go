@@ -144,12 +144,12 @@ func (c *Client) Fetch(ctx context.Context, loc Location, forecastDays int, unit
 
 	var raw struct {
 		Current struct {
-			Temperature      float64 `json:"temperature_2m"`
-			Humidity         int     `json:"relative_humidity_2m"`
-			ApparentTemp     float64 `json:"apparent_temperature"`
-			WeatherCode      int     `json:"weather_code"`
-			WindSpeed        float64 `json:"wind_speed_10m"`
-			WindDirection    int     `json:"wind_direction_10m"`
+			Temperature   float64 `json:"temperature_2m"`
+			Humidity      int     `json:"relative_humidity_2m"`
+			ApparentTemp  float64 `json:"apparent_temperature"`
+			WeatherCode   int     `json:"weather_code"`
+			WindSpeed     float64 `json:"wind_speed_10m"`
+			WindDirection int     `json:"wind_direction_10m"`
 		} `json:"current"`
 		Daily struct {
 			Time        []string  `json:"time"`

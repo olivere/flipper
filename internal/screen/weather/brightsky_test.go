@@ -180,10 +180,10 @@ func TestBrightSkyFetchParsing(t *testing.T) {
 func TestConvertToImperial(t *testing.T) {
 	data := &WeatherData{
 		Current: CurrentWeather{
-			Temperature: 0,    // 0°C = 32°F
-			HighTemp:    100,  // 100°C = 212°F
-			LowTemp:     -40,  // -40°C = -40°F
-			WindSpeed:   100,  // 100 km/h ≈ 62.14 mph
+			Temperature: 0,   // 0°C = 32°F
+			HighTemp:    100, // 100°C = 212°F
+			LowTemp:     -40, // -40°C = -40°F
+			WindSpeed:   100, // 100 km/h ≈ 62.14 mph
 		},
 		Daily: []DailyForecast{
 			{HighTemp: 20, LowTemp: 10},

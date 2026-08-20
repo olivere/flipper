@@ -105,7 +105,8 @@ func newDevicesCmd(configPath *string) *cobra.Command {
 			}
 			for _, d := range devs {
 				if checkUpdates {
-					fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
+					fmt.Fprintf(
+						w, "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
 						d.MAC,
 						valOrDash(d.Name),
 						valOrDash(d.Telemetry.FirmwareVersion),
@@ -117,7 +118,8 @@ func newDevicesCmd(configPath *string) *cobra.Command {
 					)
 					continue
 				}
-				fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
+				fmt.Fprintf(
+					w, "%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
 					d.MAC,
 					valOrDash(d.Name),
 					valOrDash(d.Telemetry.FirmwareVersion),
@@ -211,7 +213,8 @@ func newFirmwareCmd(configPath *string) *cobra.Command {
 			w := tabwriter.NewWriter(cmd.OutOrStdout(), 0, 0, 2, ' ', 0)
 			fmt.Fprintln(w, "VERSION\tPUBLISHED\tPRERELEASE\tNAME\tURL")
 			for _, r := range releases {
-				fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n",
+				fmt.Fprintf(
+					w, "%s\t%s\t%s\t%s\t%s\n",
 					r.Version,
 					formatDate(r.PublishedAt),
 					yesNo(r.Prerelease),
@@ -296,7 +299,8 @@ func newFirmwareCmd(configPath *string) *cobra.Command {
 			}
 			for _, d := range devs {
 				if showArmed {
-					fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
+					fmt.Fprintf(
+						w, "%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
 						d.MAC,
 						valOrDash(d.Name),
 						valOrDash(d.Telemetry.Model),
@@ -307,7 +311,8 @@ func newFirmwareCmd(configPath *string) *cobra.Command {
 					)
 					continue
 				}
-				fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\n",
+				fmt.Fprintf(
+					w, "%s\t%s\t%s\t%s\t%s\t%s\n",
 					d.MAC,
 					valOrDash(d.Name),
 					valOrDash(d.Telemetry.Model),
@@ -445,7 +450,8 @@ func newFirmwareUpdateCmd(configPath *string) *cobra.Command {
 			}
 
 			binPath := filepath.Join(store.Dir(), bin.Filename)
-			fmt.Fprintf(cmd.OutOrStdout(),
+			fmt.Fprintf(
+				cmd.OutOrStdout(),
 				"Device:    %s%s\nReported:  %s (%s)\nTarget:    %s (%s)  sha256=%s\nFile:      %s\n\n",
 				dev.MAC,
 				maybeQuotedName(dev.Name),
