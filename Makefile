@@ -1,4 +1,4 @@
-.PHONY: help install setup build test image
+.PHONY: help install setup build test lint image
 
 BIN := bin/flipper
 MODULE := github.com/olivere/flipper
@@ -18,6 +18,25 @@ build: ## Build to bin/flipper
 
 test: ## Run all tests
 	go test ./...
+
+# Package directories rather than ".", so a git worktree checked out
+# under .claude/ is not formatted as part of this module.
+PKG_DIRS = $$(go list -f '{{.Dir}}' ./...)
+
+lint: ## Run vet, staticcheck, govulncheck, and format checks
+	go vet ./...
+	@command -v staticcheck >/dev/null || { echo "staticcheck not found: go install honnef.co/go/tools/cmd/staticcheck@latest"; exit 1; }
+	staticcheck ./...
+	@command -v govulncheck >/dev/null || { echo "govulncheck not found: go install golang.org/x/vuln/cmd/govulncheck@latest"; exit 1; }
+	govulncheck ./...
+	@command -v gofumpt >/dev/null || { echo "gofumpt not found: go install mvdan.cc/gofumpt@latest"; exit 1; }
+	@dirs="$(PKG_DIRS)"; \
+	unformatted=$$( { gofmt -l $$dirs; gofumpt -l $$dirs; } | sort -u ); \
+	if [ -n "$$unformatted" ]; then \
+		echo "unformatted files (fix with: gofumpt -w . && gofmt -w .):"; \
+		echo "$$unformatted"; \
+		exit 1; \
+	fi
 
 image: ## Build Docker image
 	docker build -t flipper .

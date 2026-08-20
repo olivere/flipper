@@ -233,27 +233,60 @@ TRMNL upstream releases on GitHub carry no `.bin` attachments. Their official cl
 
 The combined image you can download from `trmnl.com/firmware/...` is correct for [`docs/recovery.md`](docs/recovery.md) but **wrong for OTA**. If you arm it, the device will dutifully download the bytes, fail verification with no log entry, and keep running the old firmware. (You won't see this in Flipper either — TRMNL devices don't ack flash outcomes.)
 
-To extract the app-only image from a combined image, strip the first 64 KiB (bootloader + partition-table area; the app sits at flash offset `0x10000`):
+The app partition offset is not the same on every model, so don't assume a fixed number — read it out of the combined image's partition table at `0x8000`. On TRMNL OG the app sits at `0x10000`; on TRMNL X it's at `0x20000`. Stripping the OG's 64 KiB off an X image gives you something shifted by 64 KiB that downloads happily and then fails verification with nothing in any log.
+
+The script below reads the partition table, extracts the app at its real offset, trims the flash padding, and checks the result against the SHA-256 that ESP-IDF appends to every image:
 
 ```bash
-# Download the combined image
-curl -fLo trmnl-og-FW1.8.2.bin https://trmnl.com/firmware/trmnl/FW1.8.2.bin
-
-# Strip the first 64 KiB to get the OTA-ready app
-dd if=trmnl-og-FW1.8.2.bin of=trmnl-og-FW1.8.2-app.bin bs=4096 skip=16
-
-# Sanity check: first byte must be 0xE9 (ESP image magic), and the entry-point
-# bytes at offset 0x04-0x07 (little-endian) should land in the app IRAM range
-# — roughly 0x4038xxxx for ESP32-C3 apps (vs 0x403cxxxx for the bootloader).
-xxd trmnl-og-FW1.8.2-app.bin | head -1
-# expect: 00000000: e9.. .... f61d 3840 ...   ← entry point 0x40381df6 → app
+curl -fLo trmnl-x-FW1.8.12.bin https://trmnl.com/firmware/trmnl_x/FW1.8.12.bin
+python3 extract-app.py trmnl-x-FW1.8.12.bin trmnl-x-FW1.8.12-app.bin
+# app at 0x20000, 1473648 bytes, SHA-256 OK
 ```
+
+```python
+# extract-app.py — combined flash image → OTA-ready app image
+import hashlib, struct, sys
+
+raw = open(sys.argv[1], 'rb').read()
+
+# Partition table lives at 0x8000. Find the first app partition (type 0x00).
+off = size = None
+for i in range(0x8000, 0x9000, 32):
+    e = raw[i:i + 32]
+    if e[:2] != b'\xaa\x50':
+        break
+    if e[2] == 0x00:
+        off, size = struct.unpack('<II', e[4:12])
+        break
+if off is None:
+    sys.exit('no app partition found')
+
+# Walk the image header to find where the app actually ends.
+app = raw[off:off + size]
+if app[0] != 0xE9:
+    sys.exit(f'bad magic {app[0]:#x} at {off:#x}')
+pos = 24
+for _ in range(app[1]):                      # app[1] = segment count
+    pos += 8 + struct.unpack('<I', app[pos + 4:pos + 8])[0]
+pos = (pos + 1 + 15) & ~15                   # checksum byte, then 16-byte align
+if app[23] == 1:
+    pos += 32                                # appended SHA-256
+
+img = app[:pos]
+if hashlib.sha256(img[:-32]).digest() != img[-32:]:
+    sys.exit('SHA-256 mismatch — image is truncated or misaligned')
+
+open(sys.argv[2], 'wb').write(img)
+print(f'app at {off:#x}, {len(img)} bytes, SHA-256 OK')
+```
+
+That hash check is the test worth trusting. Comparing entry points by eye (app images start `0x4037`–`0x4038`, bootloaders `0x403c`) only tells you the offset is plausible; the hash tells you the image is intact and correctly bounded.
 
 Alternatively, build from source: clone [`usetrmnl/trmnl-firmware`](https://github.com/usetrmnl/trmnl-firmware), check out the version tag, install PlatformIO, run `pio run -e trmnl` (for OG; use `trmnl_x` for TRMNL X). The output at `.pio/build/<env>/firmware.bin` is the app-only image, guaranteed correct.
 
 ##### Applying the update
 
-The device model passed via `--model` must match what the target device reports in its `Model` header (visible in `flipper firmware status`) — e.g. `og` for TRMNL OG, `trmnl_x` for TRMNL X. A mismatch at dispatch time drops the arm with a logged error.
+The device model passed via `--model` must match what the target device reports in its `Model` header — `og` for TRMNL OG and `x` for TRMNL X. Read the exact value out of the MODEL column of `flipper devices` rather than guessing from the product name; the match is a plain string comparison. A mismatch at dispatch time drops the arm with a logged error.
 
 ```bash
 # 1. Import the OTA-ready binary you just extracted (or built).
@@ -278,6 +311,7 @@ The device model passed via `--model` must match what the target device reports 
 The flash actually runs the next time the device polls `/api/display`: Flipper serves a response with `update_firmware=true` and a `firmware_url` pointing at `/firmware/{filename}`, the device downloads and flashes, and the arm is consumed in the same step. Importantly:
 
 - **One-shot, never auto-retried.** A failed flash does not re-arm itself. The operator must explicitly arm again. This prevents the brick-loop where a device repeatedly tries to flash a bad binary on every wake.
+- **Firmware 1.8.x can silently skip the download.** Devices on 1.8.0 and later gate OTA behind `now - last_ota >= 24h` (`src/bl.cpp`), where `last_ota` is written only after a *failed* update. Two consequences. A device that failed an update in the past day ignores the next arm. And because the firmware's `getTime()` returns `0` when NTP hasn't synced yet, a device that has never failed an update (`last_ota == 0`) computes `0 - 0 = 0` and skips as well — so an arm can do nothing simply because the clock wasn't ready on that wake. The device reports neither case, and Flipper consumes the arm regardless. The tell is a `firmware update dispatched` line with no `firmware served` line after it; re-arming usually goes through on a later poll. 1.7.x has no gate and flashes immediately.
 - **Model match enforced at dispatch.** Even if the right binary is imported, the arm's recorded model must match the `Model` header the device sends; mismatched arms are dropped with a logged error.
 - **`/firmware/{filename}` is intentionally unauthenticated.** TRMNL devices don't send `ID` / `Access-Token` headers when fetching the firmware URL, so gating this endpoint by auth would block every real OTA. The security boundary is `/api/display` — it decides which binary gets dispatched to which device. The bytes themselves are not secret (they're the same builds published at `trmnl.com/firmware/`); only filenames already in the local store are served, and every request is logged with its source address.
 - **No success/failure callback.** TRMNL devices do not report flash outcomes. The signal a flash worked is that the next `/api/display` poll's `FW-Version` header reflects the new version — visible in `flipper firmware status`.
