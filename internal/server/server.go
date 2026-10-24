@@ -104,9 +104,15 @@ func Run(ctx context.Context, cfg *config.Config) error {
 		r.Get("/firmware/{filename}", h.ServeFirmware)
 	}
 
+	// No WriteTimeout: devices pull multi-megabyte firmware images over
+	// slow Wi-Fi, and a fixed write deadline would cut those downloads.
 	srv := &http.Server{
-		Addr:    cfg.Server.Addr,
-		Handler: r,
+		Addr:              cfg.Server.Addr,
+		Handler:           r,
+		ReadHeaderTimeout: 10 * time.Second,
+		ReadTimeout:       30 * time.Second,
+		IdleTimeout:       120 * time.Second,
+		MaxHeaderBytes:    64 << 10,
 	}
 
 	tlsCfg := cfg.Server.TLS
