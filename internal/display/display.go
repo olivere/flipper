@@ -9,7 +9,6 @@ import (
 	"image/png"
 
 	"github.com/disintegration/imaging"
-	"github.com/jsummers/gobmp"
 	"github.com/makeworld-the-better-one/dither/v2"
 )
 
@@ -105,9 +104,8 @@ func encodeOriginal(img *image.NRGBA) (*Result, error) {
 
 	dithered := d.DitherPaletted(img)
 
-	// Encode as BMP (gobmp auto-detects 1-bit from 2-color palette)
 	var buf bytes.Buffer
-	if err := gobmp.Encode(&buf, dithered); err != nil {
+	if err := encodeBMP1(&buf, dithered); err != nil {
 		return nil, fmt.Errorf("encode bmp: %w", err)
 	}
 

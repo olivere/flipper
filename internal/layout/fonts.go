@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/golang/freetype/truetype"
 	"golang.org/x/image/font"
+	"golang.org/x/image/font/opentype"
 )
 
 // The OFL license texts are embedded alongside the fonts so that
@@ -29,7 +29,7 @@ const (
 )
 
 var (
-	fontCache   = make(map[FontStyle]*truetype.Font)
+	fontCache   = make(map[FontStyle]*opentype.Font)
 	fontCacheMu sync.RWMutex
 )
 
@@ -44,7 +44,7 @@ func fontPath(style FontStyle) string {
 	}
 }
 
-func loadFont(style FontStyle) (*truetype.Font, error) {
+func loadFont(style FontStyle) (*opentype.Font, error) {
 	fontCacheMu.RLock()
 	if f, ok := fontCache[style]; ok {
 		fontCacheMu.RUnlock()
@@ -64,7 +64,7 @@ func loadFont(style FontStyle) (*truetype.Font, error) {
 	if err != nil {
 		return nil, fmt.Errorf("layout: read font: %w", err)
 	}
-	f, err := truetype.Parse(data)
+	f, err := opentype.Parse(data)
 	if err != nil {
 		return nil, fmt.Errorf("layout: parse font: %w", err)
 	}
@@ -78,9 +78,13 @@ func Face(style FontStyle, size float64) (font.Face, error) {
 	if err != nil {
 		return nil, err
 	}
-	return truetype.NewFace(f, &truetype.Options{
+	face, err := opentype.NewFace(f, &opentype.FaceOptions{
 		Size:    size,
 		DPI:     72,
 		Hinting: font.HintingFull,
-	}), nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("layout: new face: %w", err)
+	}
+	return face, nil
 }
